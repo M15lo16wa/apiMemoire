@@ -1,0 +1,40 @@
+{
+  "development": {
+    "username": "med",
+    "password": "passer",
+    "database": "sante",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres",
+    "seederStorage": "sequelize",
+    "logging": false,
+    "dialectOptions": {
+      "ssl": false
+    }
+  },
+  "test": {
+    "username": "med",
+    "password": "passer",
+    "database": "sante_test",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres",
+    "logging": false
+  },
+  "production": {
+    "username": "med",
+    "password": "passer",
+    "database": "sante_prod",
+    "host": "localhost",
+    "port": 5432,
+    "dialect": "postgres",
+    "seederStorage": "sequelize",
+    "logging": false,
+    "dialectOptions": {
+      "ssl": {
+        "require": true,
+        "rejectUnauthorized": false
+      }
+    }
+  }
+}

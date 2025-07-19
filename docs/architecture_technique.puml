@@ -1,0 +1,24 @@
+@startuml
+!theme spacelab
+
+' Frontend
+rectangle "Frontend Web (React/Vue)" as FE #SkyBlue
+
+' API Gateway
+node "API Gateway (NestJS)" as APIGW #LightYellow {
+  [Auth Module (OAuth2/JWT)] as AUTH
+  [Patient/Dossier Modules] as MODULES
+  [HistoriqueAcces Module] as HIST
+  [IA Microservice (Python/Node)] as IA
+}
+
+' Database
+database "PostgreSQL DB\n(Dossiers, Docs, Patients, Hist.)" as PG #LightGreen
+
+FE -down- APIGW : HTTPS/REST
+APIGW -down- PG : SQL
+AUTH -[hidden]- MODULES
+MODULES -[hidden]- HIST
+HIST -[hidden]- IA
+
+@enduml

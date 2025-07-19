@@ -1,0 +1,205 @@
+# Documentation des Modèles et Migrations
+
+## Table des Matières
+1. [Modèle Patient](#modèle-patient)
+2. [Modèle ServiceSante](#modèle-servicesante)
+3. [Logique Métier](#logique-métier)
+4. [Bonnes Pratiques](#bonnes-pratiques)
+5. [Méthodes Utilitaires](#méthodes-utilitaires)
+
+## Modèle Patient
+
+### Champs Principaux
+- **Informations personnelles** : `nom`, `prenom`, `date_naissance`, `lieu_naissance`, `genre`, `groupe_sanguin`, `taille`, `poids`
+- **Coordonnées** : `adresse`, `ville`, `code_postal`, `pays`, `telephone`, `email`
+- **Médical** : `antecedents_medicaux`, `allergies`, `traitements_en_cours`
+- **Sécurité** : `numero_securite_sociale` (unique), `statut` (actif/inactif)
+
+### Validations
+- Formats pour email, téléphone, code postal, numéro de sécurité sociale
+- Vérification de l'âge minimum (>= 0 ans)
+- Validation des enums (groupe sanguin, genre, statut)
+
+### Hooks
+- `beforeValidate` : Nettoyage des champs (trim, majuscules)
+- `beforeCreate` : Vérification de l'unicité du numéro de sécurité sociale
+
+## Modèle ServiceSante
+
+### Rôle et Objectif
+Le modèle `ServiceSante` représente un service médical au sein d'un établissement de santé. Il sert principalement à :
+- Organiser les professionnels de santé par spécialité
+- Structurer les dossiers médicaux par service
+- Faciliter la gestion des consultations et des suivis médicaux
+
+### Champs Principaux
+- **Identification** :
+  - `code` (String, unique) : Code d'identification du service
+  - `nom` (String) : Nom complet du service
+  - `description` (Text) : Description des activités du service
+
+- **Type de Service** :
+  - `type_service` (Enum) : Type de service parmi :
+    - `medecine_generale`
+    - `pediatrie`
+    - `chirurgie`
+    - `urgences`
+    - `radiologie`
+    - `biologie`
+    - `pharmacie`
+    - `consultation`
+    - `hospitalisation`
+    - `autre`
+
+- **Coordonnées** :
+  - `telephone` (String) : Numéro de contact du service
+  - `email` (String) : Adresse email de contact
+
+- **Références** :
+  - `hopital_id` (Integer) : Référence à l'établissement de santé
+  - `responsable_id` (Integer) : Référence au professionnel responsable
+
+- **Statut** :
+  - `statut` (Enum) : `actif` ou `inactif`
+
+### Relations
+- `Hopital` (belongsTo) : Établissement de santé auquel appartient le service
+- `ProfessionnelSante` (hasMany) : Professionnels exerçant dans ce service
+- `DossierMedical` (hasMany) : Dossiers médicaux gérés par ce service
+
+### Méthodes Utilitaires
+- `getDossiersMedicaux(options)` : Récupère tous les dossiers médicaux du service
+- `getProfessionnels(options)` : Liste les professionnels du service
+
+### Scopes
+- `avecInactifs` : Inclut les services inactifs
+- `parHopital(hopitalId)` : Filtre par établissement de santé
+- `parType(type)` : Filtre par type de service
+
+## Logique Métier
+
+### Gestion des Dossiers Médicaux
+1. **Création/MAJ**
+   - Un dossier médical est toujours rattaché à un service spécifique
+   - Un patient peut avoir plusieurs dossiers médicaux dans différents services
+   - Chaque dossier a un médecin référent assigné
+
+2. **Sécurité des Données**
+   - Accès restreint aux professionnels du service concerné
+   - Journalisation des accès aux dossiers
+   - Respect du secret médical et du RGPD
+
+### Gestion des Services de Santé
+1. **Organisation**
+   - Chaque service appartient à un seul établissement de santé
+   - Un professionnel peut être affecté à plusieurs services
+   - Le responsable du service a des droits d'administration
+
+2. **Validation**
+   - Unicité du code de service par établissement
+   - Vérification des références (hôpital, responsable)
+   - Formats valides (email, téléphone)
+
+### Gestion des Rendez-vous
+1. **Prise de Rendez-vous**
+   - Vérification de la disponibilité du professionnel
+   - Gestion des créneaux horaires par service
+   - Envoi de notifications de rappel
+
+## Bonnes Pratiques
+
+### Sécurité
+- Hachage des données sensibles (mots de passe)
+- Exclusion des champs sensibles par défaut (scopes)
+- Validation stricte des entrées utilisateur
+
+### Performance
+- Index sur les champs fréquemment recherchés
+- Chargement paresseux des relations
+- Pagination des résultats de recherche
+
+### Maintenance
+- Documentation des champs (commentaires)
+- Codes d'erreur explicites
+- Logging des opérations critiques
+
+## Méthodes Utilitaires
+
+### Patient
+- `calculerAge()` : Calcule l'âge à partir de la date de naissance
+- `getFullName()` : Retourne le nom complet formaté
+- `findByName(term)` : Recherche par nom/prénom (statique)
+- `getPrescriptions([options])` : Récupère toutes les prescriptions du patient à travers ses dossiers médicaux
+  - Inclut les informations du professionnel de santé prescripteur
+  - Triées par date de prescription décroissante
+  - Options de requête Sequelize personnalisables
+- `getExamensLabo([options])` : Récupère tous les examens de laboratoire du patient
+  - Inclut les informations du prescripteur et du service de santé
+  - Triés par date de prélèvement décroissante
+  - Options de requête Sequelize personnalisables
+
+### ServiceSante
+- `getDossiersMedicaux([options])` : Récupère tous les dossiers médicaux gérés par le service
+  - Inclut les informations des patients et des professionnels référents
+  - Options de requête Sequelize personnalisables
+- `getProfessionnels([options])` : Liste les professionnels du service
+  - Inclut les informations utilisateur associées
+  - Options de filtrage et de tri personnalisables
+- **Scopes prédéfinis** :
+  - `avecInactifs` : Inclut les services inactifs dans les résultats
+  - `parHopital(hopitalId)` : Filtre les services par établissement
+  - `parType(type)` : Filtre les services par type (médecine, chirurgie, etc.)
+
+## Guide de Migration
+
+### Prérequis
+- Node.js 14+
+- PostgreSQL 12+
+- Configuration de la base de données dans `.env`
+
+### Commandes
+```bash
+# Exécuter les migrations
+npx sequelize-cli db:migrate
+
+# Annuler la dernière migration
+npx sequelize-cli db:migrate:undo
+
+# Exécuter les seeders
+npx sequelize-cli db:seed:all
+```
+
+### Ordre des Migrations
+1. Utilisateurs
+2. Hopitaux
+3. ServicesSante
+4. ProfessionnelsSante
+5. Patients
+6. DossiersMedicaux
+7. Consultations
+8. RendezVous
+9. Prescriptions
+10. ExamensLabo
+11. AutorisationsAcces
+12. HistoriquesAcces
+
+## Dépannage
+
+### Problèmes Courants
+1. **Échec de migration**
+   - Vérifier les logs d'erreur
+   - S'assurer que la base de données est accessible
+   - Vérifier les contraintes de clé étrangère
+
+2. **Données de test**
+   - Utiliser les seeders pour les données de test
+   - Vérifier les contraintes d'unicité
+
+3. **Problèmes de performance**
+   - Vérifier les index manquants
+   - Optimiser les requêtes N+1
+
+## Évolution Future
+- Ajout de l'historique des modifications
+- Intégration avec un système de messagerie
+- API GraphQL en plus de REST
