@@ -261,17 +261,17 @@ module.exports = (sequelize) => {
    */
   ServiceSante.prototype.getProfessionnels = async function(options = {}) {
     return await this.getProfessionnelsDuService({
-       include: [
-         {
-           model: sequelize.models.Utilisateur,
-           attributes: ['nom', 'prenom', 'email', 'telephone']
-         }
-       ],
-       order: [
-         [{ model: sequelize.models.Utilisateur }, 'nom', 'ASC'],
-         [{ model: sequelize.models.Utilisateur }, 'prenom', 'ASC']
-       ],
-       ...options
+      include: [
+          {
+            model: sequelize.models.Utilisateur,
+            attributes: ['nom', 'prenom', 'email', 'telephone']
+          }
+        ],
+        order: [
+          [{ model: sequelize.models.Utilisateur }, 'nom', 'ASC'],
+          [{ model: sequelize.models.Utilisateur }, 'prenom', 'ASC']
+        ],
+      ...options
     });
   };
 

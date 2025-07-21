@@ -428,6 +428,19 @@ const swaggerDefinition = {
             description: 'Date de dernière mise à jour'
           }
         }
+      },
+      ServiceSante: {
+        type: 'object',
+        properties: {
+          id_service: { type: 'integer', description: 'Identifiant unique du service de santé' },
+          nom: { type: 'string', description: 'Nom du service de santé' },
+          type_service: { type: 'string', description: 'Type du service (ex: CARDIOLOGIE, URGENCE, etc.)' },
+          hopital_id: { type: 'integer', description: "Identifiant de l'hôpital auquel appartient le service" },
+          description: { type: 'string', description: 'Description du service', nullable: true },
+          telephone: { type: 'string', description: 'Numéro de téléphone du service', nullable: true },
+          createdAt: { type: 'string', format: 'date-time', description: 'Date de création' },
+          updatedAt: { type: 'string', format: 'date-time', description: 'Date de dernière mise à jour' }
+        }
       }
     }
   },
@@ -442,6 +455,102 @@ const options = {
 const swaggerSpec = swaggerJSDoc(options);
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Ajout des tags et des routes CRUD dans swaggerJsdoc (exemple OpenAPI)
+/**
+ * @swagger
+ * tags:
+ *   - name: ServiceSante
+ *     description: Gestion des services de santé
+ *
+ * /api/service-sante:
+ *   post:
+ *     summary: Créer un service de santé
+ *     tags: [ServiceSante]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ServiceSante'
+ *     responses:
+ *       201:
+ *         description: Service créé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ServiceSante'
+ *   get:
+ *     summary: Lister tous les services de santé
+ *     tags: [ServiceSante]
+ *     parameters:
+ *       - in: query
+ *         name: hopital_id
+ *         schema:
+ *           type: integer
+ *         description: Filtrer par hôpital
+ *     responses:
+ *       200:
+ *         description: Liste des services
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ServiceSante'
+ *
+ * /api/service-sante/{id}:
+ *   get:
+ *     summary: Détail d'un service de santé
+ *     tags: [ServiceSante]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Détail du service
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ServiceSante'
+ *   put:
+ *     summary: Modifier un service de santé
+ *     tags: [ServiceSante]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ServiceSante'
+ *     responses:
+ *       200:
+ *         description: Service modifié
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ServiceSante'
+ *   delete:
+ *     summary: Supprimer un service de santé
+ *     tags: [ServiceSante]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       204:
+ *         description: Service supprimé
+ */
 
 // Gestion des routes non trouvées (404 Not Found)
 app.all('*', (req, res, next) => {

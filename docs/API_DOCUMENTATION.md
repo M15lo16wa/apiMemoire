@@ -547,3 +547,233 @@ Consultez le fichier `.env` pour les variables de configuration :
 4. Démarrer le serveur : `npm start`
 
 Le serveur démarre par défaut sur le port configuré dans les variables d'environnement.
+
+## Seeders : création automatique des utilisateurs et professionnels de santé
+
+Pour faciliter les tests et la prise en main de la plateforme, un script de seed permet de créer automatiquement des comptes utilisateurs (secrétaires) et des professionnels de santé (médecins, infirmiers) associés à chaque service de santé.
+
+### Fonctionnement du seeder
+- Pour chaque service de santé existant, le script crée automatiquement :
+  - Un médecin (rôle `medecin` dans ProfessionnelSante)
+  - Un infirmier (rôle `infirmier` dans ProfessionnelSante)
+- Pour chaque professionnel, un compte utilisateur associé est créé avec le rôle `secretaire` (plateforme).
+- Les emails générés sont uniques et de la forme : `prenom.nom.idservice.compteur@nomservice.com`
+
+### Mot de passe par défaut
+- **Tous les comptes utilisateurs créés automatiquement ont le mot de passe suivant :**
+
+```
+Test@1234
+```
+
+- Pensez à changer ce mot de passe en production ou à la première connexion.
+
+### Exemple d’utilisateur généré
+```json
+{
+  "nom": "Diop",
+  "prenom": "Mamadou",
+  "email": "mamadou.diop.1.0@medecinegenerale.com",
+  "mot_de_passe": "Test@1234",
+  "role": "secretaire"
+}
+```
+
+### Exemple de professionnel de santé généré
+```json
+{
+  "nom": "Diop",
+  "prenom": "Mamadou",
+  "email": "mamadou.diop.1.0@medecinegenerale.com",
+  "role": "medecin",
+  "specialite": "Médecine Générale",
+  "service_id": 1,
+  "utilisateur_id": 10
+}
+```
+
+## Script de seed utilisé pour la création automatique des utilisateurs et professionnels de santé
+
+Voici le code source du script utilisé pour générer automatiquement les comptes utilisateurs (secrétaires) et professionnels de santé (médecins, infirmiers) :
+
+```js
+const { ProfessionnelSante, ServiceSante, Utilisateur, sequelize } = require('../src/models');
+
+// Listes de noms et prénoms sénégalais typiques
+const noms = ['Diop', 'Sarr', 'Fall', 'Ndiaye', 'Ba', 'Faye', 'Gueye', 'Sow', 'Sy', 'Ndoye'];
+const prenomsMedecin = ['Mamadou', 'Cheikh', 'Ibrahima', 'Abdoulaye', 'Ousmane', 'Aliou', 'Serigne', 'Moussa', 'Pape', 'Amadou'];
+const prenomsInfirmier = ['Fatou', 'Aminata', 'Mariama', 'Astou', 'Awa', 'Khady', 'Ndeye', 'Bineta', 'Sokhna', 'Coumba'];
+
+// Seuls les rôles autorisés pour ProfessionnelSante
+const profils = [
+  { role: 'medecin', specialite: 'Médecine Générale' },
+  { role: 'infirmier', specialite: 'Soins Infirmiers' }
+];
+
+function getRandom(array) {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+async function generateUniqueEmail(prenom, nom, service, compteur) {
+  let base = `${prenom.toLowerCase()}.${nom.toLowerCase()}.${service.id_service}.${compteur}`;
+  let email = `${base}@${service.nom.replace(/\s+/g, '').toLowerCase()}.com`;
+  let exists = await Utilisateur.findOne({ where: { email } });
+  let suffix = 1;
+  while (exists) {
+    email = `${base}.${Date.now()}${suffix}@${service.nom.replace(/\s+/g, '').toLowerCase()}.com`;
+    exists = await Utilisateur.findOne({ where: { email } });
+    suffix++;
+  }
+  return email;
+}
+
+async function seed() {
+  try {
+    await sequelize.authenticate();
+    const services = await ServiceSante.findAll();
+    if (!services.length) throw new Error('Aucun service de santé trouvé.');
+    let compteur = 0;
+    for (const service of services) {
+      for (const profil of profils) {
+        let prenom;
+        if (profil.role === 'medecin') prenom = prenomsMedecin[compteur % prenomsMedecin.length];
+        else prenom = prenomsInfirmier[compteur % prenomsInfirmier.length];
+        const nom = noms[compteur % noms.length];
+        const email = await generateUniqueEmail(prenom, nom, service, compteur);
+        const mot_de_passe = 'Test@1234';
+        // Vérifier si l'utilisateur existe déjà
+        let utilisateur = await Utilisateur.findOne({ where: { email } });
+        if (!utilisateur) {
+          utilisateur = await Utilisateur.create({
+            nom,
+            prenom,
+            email,
+            mot_de_passe,
+            role: 'secretaire', // Toujours 'secretaire' pour la plateforme
+            statut: 'actif'
+          });
+        }
+        // Vérifier si le professionnel existe déjà
+        let professionnel = await ProfessionnelSante.findOne({ where: { email } });
+        if (!professionnel) {
+          professionnel = await ProfessionnelSante.create({
+            nom,
+            prenom,
+            email,
+            telephone: '77' + String(1000000 + compteur).slice(0,7),
+            role: profil.role, // 'medecin' ou 'infirmier'
+            specialite: profil.specialite,
+            statut: 'actif',
+            service_id: service.id_service,
+            utilisateur_id: utilisateur.id_utilisateur
+          });
+          console.log(`Ajouté : ${profil.role} ${prenom} ${nom} pour le service ${service.nom}`);
+        } else {
+          // Mettre à jour les champs vides si besoin
+          let updated = false;
+          if (!professionnel.specialite) { professionnel.specialite = profil.specialite; updated = true; }
+          if (!professionnel.telephone) { professionnel.telephone = '77' + String(1000000 + compteur).slice(0,7); updated = true; }
+          if (!professionnel.role) { professionnel.role = profil.role; updated = true; }
+          if (!professionnel.statut) { professionnel.statut = 'actif'; updated = true; }
+          if (!professionnel.service_id) { professionnel.service_id = service.id_service; updated = true; }
+          if (!professionnel.utilisateur_id) { professionnel.utilisateur_id = utilisateur.id_utilisateur; updated = true; }
+          if (updated) {
+            await professionnel.save();
+            console.log(`Mis à jour : ${profil.role} ${prenom} ${nom} pour le service ${service.nom}`);
+          } else {
+            console.log(`Déjà existant : ${profil.role} ${prenom} ${nom} pour le service ${service.nom}`);
+          }
+        }
+        compteur++;
+      }
+    }
+    console.log('Tous les professionnels de santé ont été ajoutés/mis à jour avec succès.');
+  } catch (error) {
+    console.error('Erreur lors de l\'insertion des professionnels de santé :', error);
+  } finally {
+    await sequelize.close();
+  }
+}
+
+seed();
+```
+
+**Mot de passe utilisé pour tous les comptes générés automatiquement :**
+```
+Test@1234
+```
+
+---
+
+## Récapitulatif des actions réalisées (journée du 21/07/2025)
+
+### 1. Synchronisation et correction des modèles et migrations
+- Ajout et correction des champs dans les tables `Hopitaux`, `ServiceSante`, `ProfessionnelsSante` pour garantir la cohérence avec les modèles Sequelize.
+- Création de migrations idempotentes pour ajouter ou corriger dynamiquement les colonnes manquantes (ex : `specialite`, `telephone`, `numero_licence`, etc.).
+- Correction des contraintes NOT NULL et des types ENUM pour éviter les erreurs lors des insertions.
+- Suppression des dossiers et fichiers en doublon ou avec des erreurs de casse (ex : `serviceSanté` vs `serviceSante`).
+
+### 2. Seeders et alimentation automatique de la base
+- Création d’un seeder pour insérer rapidement plusieurs hôpitaux sénégalais typiques.
+- Création d’un seeder pour insérer automatiquement des services de santé pour chaque hôpital.
+- Création d’un seeder pour insérer automatiquement des professionnels de santé (médecins et infirmiers) pour chaque service, avec génération de comptes utilisateurs associés.
+- Génération d’emails uniques et mot de passe par défaut `Test@1234` pour tous les comptes créés automatiquement.
+
+### 3. Sécurisation et logique métier
+- Sécurisation des routes des services de santé par middleware d’authentification et restriction par rôle (`admin` uniquement pour la création, modification, suppression).
+- Interdiction d’accès aux routes des services de santé pour les patients.
+- Respect strict de la logique :
+  - Table `Utilisateur` : uniquement les rôles `admin` et `secretaire`.
+  - Table `ProfessionnelSante` : uniquement les rôles `medecin` et `infirmier`.
+
+### 4. Documentation et Swagger
+- Mise à jour de la documentation Swagger pour tous les modules concernés (hôpitaux, services de santé, professionnels de santé).
+- Ajout d’exemples, de schémas, et de la documentation sur les seeders et le mot de passe par défaut.
+- Ajout du code source du seeder dans la documentation pour transparence et reproductibilité.
+
+### 5. Résolution d’erreurs et nettoyage
+- Résolution des erreurs de migration, d’ENUM, de contraintes NOT NULL, de conflits de casse et de doublons de dossiers.
+- Nettoyage des dossiers parasites et correction des imports pour garantir le bon fonctionnement de l’application.
+
+---
+
+Ce récapitulatif permet de garder une trace claire de toutes les évolutions et corrections apportées à la plateforme lors de cette journée de travail.
+
+## Politique de sécurisation des routes de la plateforme
+
+L’ensemble des routes sensibles de la plateforme est protégé par des middlewares d’authentification (JWT) et d’autorisation par rôle. Cela garantit que seules les personnes habilitées peuvent accéder ou modifier les données selon leur profil.
+
+### Règles générales appliquées
+- **Authentification obligatoire** pour toutes les routes de gestion (patients, hôpitaux, professionnels, dossiers, services, etc.).
+- **Autorisation par rôle** :
+  - Seuls les utilisateurs avec le rôle `admin` peuvent créer, modifier ou supprimer des entités sensibles (hôpitaux, services de santé, professionnels, etc.).
+  - Les secrétaires peuvent accéder à certaines routes de consultation, mais pas à la création/suppression.
+  - Les patients n’ont accès qu’à leurs propres données (dossier, rendez-vous, etc.).
+  - Les professionnels de santé (médecins, infirmiers) ont accès aux données des patients selon leur service et leurs autorisations.
+- **Interdiction stricte** pour les patients d’accéder aux routes de gestion des services de santé, professionnels, hôpitaux, etc.
+
+### Exemples de protection appliquée
+| Route                                 | Authentification | Rôle(s) autorisé(s)         |
+|---------------------------------------|------------------|-----------------------------|
+| `GET /api/patient`                    | Oui              | admin, professionnel_sante  |
+| `POST /api/patient`                   | Oui              | admin                       |
+| `GET /api/hopital`                    | Oui              | admin, secretaire           |
+| `POST /api/hopital`                   | Oui              | admin                       |
+| `GET /api/service-sante`              | Oui              | admin, secretaire, médecin, infirmier |
+| `POST /api/service-sante`             | Oui              | admin                       |
+| `GET /api/professionnelSante`         | Oui              | admin, secretaire           |
+| `POST /api/professionnelSante`        | Oui              | admin                       |
+| `GET /api/patient/:id`                | Oui              | admin, professionnel_sante, patient (lui-même) |
+| `GET /api/dossierMedical/:id`         | Oui              | admin, professionnel_sante, patient (lui-même) |
+
+### Middleware utilisés
+- `protect` : vérifie la présence et la validité du token JWT.
+- `restrictTo('admin')` : limite l’accès à certains rôles (ex : admin uniquement).
+- Middleware personnalisé pour interdire l’accès aux patients sur certains modules.
+
+### Résumé
+- **Aucune route sensible n’est accessible sans authentification.**
+- **Les droits sont vérifiés à chaque requête selon le rôle de l’utilisateur.**
+- **La sécurité est centralisée dans les middlewares Express pour garantir la cohérence sur toute la plateforme.**
+
+---

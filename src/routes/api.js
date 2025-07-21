@@ -6,6 +6,7 @@ const professionnelSanteRoutes = require('../modules/professionnelSante/professi
 const dossierMedicalRoutes = require('../modules/dossierMedical/dossierMedical.route');
 const consultationRoutes = require('../modules/consultation/consultationRoutes');
 const hopitalRoutes = require('../modules/hopitaux/hopitaux.route');
+const serviceSanteRoutes = require('../modules/serviceSante/serviceSante.route');
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ router.use('/auth', authRoutes);
 router.use('/patient', patientRoutes);
 router.use('/professionnelSante', professionnelSanteRoutes);
 router.use('/hopital', hopitalRoutes);
+router.use('/service-sante', serviceSanteRoutes);
 // router.use('/authcontroller', authController);
 
 router.use('/dossierMedical', dossierMedicalRoutes);
