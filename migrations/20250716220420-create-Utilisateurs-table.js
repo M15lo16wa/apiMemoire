@@ -53,10 +53,9 @@ module.exports = {
       role: {
         type: DataTypes.ENUM(
           'admin',  
-          'secretaire',
-          'visiteur'
+          'secretaire'
         ),
-        defaultValue: 'visiteur',
+        defaultValue: 'secretaire',
         allowNull: false,
         validate: {
           notEmpty: true

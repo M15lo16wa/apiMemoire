@@ -1,58 +1,34 @@
 'use strict';
 
-const DataTypes = require('sequelize/lib/data-types');
-
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up (queryInterface, Sequelize) {
     await queryInterface.createTable('ServicesSante', {
       id_service: {
-        type: DataTypes.INTEGER,
+        type: Sequelize.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         allowNull: false,
         comment: 'Identifiant unique du service de santé'
       },
       code: {
-        type: DataTypes.STRING(20),
+        type: Sequelize.STRING(20),
         allowNull: false,
         unique: true,
-        comment: 'Code unique identifiant le service de santé',
-        validate: {
-          notEmpty: {
-            msg: 'Le code du service est obligatoire'
-          },
-          len: {
-            args: [2, 20],
-            msg: 'Le code doit contenir entre 2 et 20 caractères'
-          },
-          is: {
-            args: /^[A-Z0-9_-]+$/,
-            msg: 'Le code ne doit contenir que des lettres majuscules, chiffres, tirets et tirets bas'
-          }
-        }
+        comment: 'Code unique identifiant le service de santé'
       },
       nom: {
-        type: DataTypes.STRING(100),
+        type: Sequelize.STRING(100),
         allowNull: false,
-        comment: 'Nom complet du service de santé',
-        validate: {
-          notEmpty: {
-            msg: 'Le nom du service est obligatoire'
-          },
-          len: {
-            args: [3, 100],
-            msg: 'Le nom doit contenir entre 3 et 100 caractères'
-          }
-        }
+        comment: 'Nom complet du service de santé'
       },
       description: {
-        type: DataTypes.TEXT,
+        type: Sequelize.TEXT,
         allowNull: true,
         comment: 'Description détaillée des activités et spécialités du service'
       },
       type_service: {
-        type: DataTypes.ENUM(
+        type: Sequelize.ENUM(
           'MEDECINE_GENERALE',
           'PEDIATRIE',
           'CHIRURGIE',
@@ -73,101 +49,50 @@ module.exports = {
         ),
         allowNull: false,
         defaultValue: 'MEDECINE_GENERALE',
-        comment: 'Type de service de santé pour le filtrage et la catégorisation',
-        validate: {
-          notEmpty: {
-            msg: 'Le type de service est obligatoire'
-          }
-        }
+        comment: 'Type de service de santé pour le filtrage et la catégorisation'
       },
       telephone: {
-        type: DataTypes.STRING(20),
+        type: Sequelize.STRING(20),
         allowNull: true,
-        comment: 'Numéro de téléphone principal du service',
-        validate: {
-          is: {
-            args: /^[0-9 +()\-]+$/,
-            msg: 'Numéro de téléphone invalide'
-          }
-        }
+        comment: 'Numéro de téléphone principal du service'
       },
       email: {
-        type: DataTypes.STRING(100),
+        type: Sequelize.STRING(100),
         allowNull: true,
-        comment: 'Adresse email de contact du service',
-        validate: {
-          isEmail: {
-            msg: 'Veuillez fournir une adresse email valide'
-          }
-        }
-      },
-      batiment: {
-        type: DataTypes.STRING(50),
-        allowNull: true,
-        comment: 'Bâtiment où se situe le service'
-      },
-      etage: {
-        type: DataTypes.STRING(20),
-        allowNull: true,
-        comment: 'Étage où se situe le service'
-      },
-      aile: {
-        type: DataTypes.STRING(10),
-        allowNull: true,
-        comment: 'Aile ou secteur du bâtiment'
-      },
-      capacite: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: 'Capacité d\'accueil du service (nombre de lits ou de places)',
-        validate: {
-          min: {
-            args: [0],
-            msg: 'La capacité ne peut pas être négative'
-          }
-        }
+        unique: true,
+        comment: 'Adresse email de contact du service'
       },
       hopital_id: {
-        type: DataTypes.INTEGER,
+        type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'Hopitaux',
+          model: 'Hopitaux', // Correction du nom de la table
           key: 'id_hopital',
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',
         comment: 'Référence à l\'hôpital auquel ce service est rattaché'
       },
-      responsable_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: 'ID du professionnel de santé responsable (géré dans index.js)'
-      },
       statut: {
-        type: DataTypes.ENUM('ACTIF', 'INACTIF', 'EN_MAINTENANCE', 'EN_CONSTRUCTION'),
+        type: Sequelize.ENUM('ACTIF', 'INACTIF', 'EN_MAINTENANCE', 'EN_CONSTRUCTION'),
         defaultValue: 'ACTIF',
         allowNull: false,
-        comment: 'Statut du service pour la gestion du cycle de vie',
-        validate: {
-          notEmpty: {
-            msg: 'Le statut est obligatoire'
-          }
-        }
+        comment: 'Statut du service pour la gestion du cycle de vie'
       },
       horaires_ouverture: {
-        type: DataTypes.JSONB,
+        type: Sequelize.JSONB,
         allowNull: true,
         comment: 'Horaires d\'ouverture du service (format JSON)',
         defaultValue: {}
       },
       informations_complementaires: {
-        type: DataTypes.JSONB,
+        type: Sequelize.JSONB,
         allowNull: true,
         comment: 'Informations complémentaires structurées',
         defaultValue: {}
       },
       createdBy: {
-        type: DataTypes.INTEGER,
+        type: Sequelize.INTEGER,
         allowNull: true,
         references: {
           model: 'Utilisateurs',
@@ -178,7 +103,7 @@ module.exports = {
         comment: 'Utilisateur ayant créé l\'enregistrement'
       },
       updatedBy: {
-        type: DataTypes.INTEGER,
+        type: Sequelize.INTEGER,
         allowNull: true,
         references: {
           model: 'Utilisateurs',
@@ -208,27 +133,23 @@ module.exports = {
     });
 
     // Ajout des index pour les champs fréquemment utilisés dans les requêtes
-    await queryInterface.addIndex('ServicesSante', ['code'], { 
+    await queryInterface.addIndex('ServicesSante', ['code'], {
       name: 'idx_services_sante_code',
-      unique: true 
+      unique: true
     });
-    
+
     await queryInterface.addIndex('ServicesSante', ['hopital_id'], {
       name: 'idx_services_sante_hopital'
     });
-    
-    await queryInterface.addIndex('ServicesSante', ['responsable_id'], {
-      name: 'idx_services_sante_responsable'
-    });
-    
+
     await queryInterface.addIndex('ServicesSante', ['type_service'], {
       name: 'idx_services_sante_type'
     });
-    
+
     await queryInterface.addIndex('ServicesSante', ['statut'], {
       name: 'idx_services_sante_statut'
     });
-    
+
     // Index composite pour les recherches fréquentes
     await queryInterface.addIndex('ServicesSante', ['hopital_id', 'type_service', 'statut'], {
       name: 'idx_services_sante_composite'
@@ -239,11 +160,10 @@ module.exports = {
     // Suppression des index personnalisés avant de supprimer la table
     await queryInterface.removeIndex('ServicesSante', 'idx_services_sante_code');
     await queryInterface.removeIndex('ServicesSante', 'idx_services_sante_hopital');
-    await queryInterface.removeIndex('ServicesSante', 'idx_services_sante_responsable');
     await queryInterface.removeIndex('ServicesSante', 'idx_services_sante_type');
     await queryInterface.removeIndex('ServicesSante', 'idx_services_sante_statut');
     await queryInterface.removeIndex('ServicesSante', 'idx_services_sante_composite');
-    
+
     // Suppression de la table
     await queryInterface.dropTable('ServicesSante');
   }

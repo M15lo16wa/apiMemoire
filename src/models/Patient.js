@@ -156,6 +156,14 @@ module.exports = (sequelize) => {
       defaultValue: 'actif',
       allowNull: false
     },
+    mot_de_passe: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      validate: {
+        notEmpty: true,
+        len: [8, 255]
+      }
+    },
     // Clé étrangère vers Utilisateur (compte associé)
     utilisateur_id: {
       type: DataTypes.INTEGER,
@@ -198,6 +206,20 @@ module.exports = (sequelize) => {
         // Nettoyage du numéro de sécurité sociale
         if (patient.numero_securite_sociale) {
           patient.numero_securite_sociale = patient.numero_securite_sociale.replace(/\s+/g, '');
+        }
+      },
+      beforeCreate: async (patient) => {
+        if (patient.mot_de_passe) {
+          const bcrypt = require('bcryptjs');
+          const salt = await bcrypt.genSalt(10);
+          patient.mot_de_passe = await bcrypt.hash(patient.mot_de_passe, salt);
+        }
+      },
+      beforeUpdate: async (patient) => {
+        if (patient.changed('mot_de_passe')) {
+          const bcrypt = require('bcryptjs');
+          const salt = await bcrypt.genSalt(10);
+          patient.mot_de_passe = await bcrypt.hash(patient.mot_de_passe, salt);
         }
       }
     }

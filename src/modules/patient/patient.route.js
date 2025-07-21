@@ -164,8 +164,8 @@ router.use(authMiddleware.protect);
 // Routes avec restriction de rôle (exemple)
 router
   .route('/')
-  .get(authMiddleware.protect, authMiddleware.restrictTo('admin', 'secretaire'), patientController.getAllPatients) // Seuls les admins et secrétaires peuvent voir tous les patients
-  .post(authMiddleware.protect, authMiddleware.restrictTo('admin'), patientController.createPatient); // Seuls les admins peuvent créer des patients
+  .get(authMiddleware.protect, authMiddleware.restrictTo('medecin', 'infirmier','secretaire'), patientController.getAllPatients) // Seuls les medecins, l'infirmier et secrétaires peuvent voir tous les patients
+  .post(authMiddleware.protect, authMiddleware.restrictTo('medecin'), patientController.createPatient); // Seuls les medecins peuvent créer des patients
 
 /**
  * @swagger
@@ -277,8 +277,8 @@ router
  */
 router
   .route('/:id')
-  .get(authMiddleware.protect, authMiddleware.restrictTo('admin', 'secretaire'), patientController.getPatient) // Un patient peut voir son propre dossier (avec la logique dans le contrôleur)
-  .patch(authMiddleware.protect, authMiddleware.restrictTo('admin', 'secretaire'), patientController.updatePatient)
+  .get(authMiddleware.protect, authMiddleware.restrictTo('medecin', 'secretaire'), patientController.getPatient) // Un patient peut voir son propre dossier (avec la logique dans le contrôleur)
+  .patch(authMiddleware.protect, authMiddleware.restrictTo('medecin', 'secretaire'), patientController.updatePatient)
   .delete(authMiddleware.protect, authMiddleware.restrictTo('admin'), patientController.deletePatient); // Seuls les admins peuvent supprimer un patient
 
 module.exports = router;

@@ -39,10 +39,7 @@ L'API utilise JWT (JSON Web Tokens) pour l'authentification. Le token doit être
   "prenom": "string (requis)", 
   "email": "string (requis)",
   "mot_de_passe": "string (requis)",
-  "telephone": "string (optionnel)",
-  "date_naissance": "date (optionnel)",
-  "sexe": "string (optionnel)",
-  "adresse": "string (optionnel)"
+  "role": "string (requis)" // admin, secretaire
 }
 ```
 
@@ -57,7 +54,7 @@ L'API utilise JWT (JSON Web Tokens) pour l'authentification. Le token doit être
       "nom": "string",
       "prenom": "string",
       "email": "string",
-      "role": "patient",
+      "role": "admin", // ou "secretaire"
       "statut": "actif"
     }
   }
@@ -289,6 +286,149 @@ Toutes les routes patients nécessitent une authentification.
 
 **Réponse (204):** Pas de contenu
 
+## Gestion des Hôpitaux
+
+Toutes les routes pour les hôpitaux nécessitent une authentification.
+
+#### POST `/api/hopital`
+**Description:** Création d'un nouvel hôpital
+**Authentification:** Requise
+**Autorisation:** admin
+
+**Corps de la requête (champs requis):**
+```json
+{
+  "nom": "string (requis)",
+  "adresse": "string (requis)",
+  "telephone": "string (requis)",
+  "type_etablissement": "string (requis, enum: Public, Privé, Spécialisé)"
+}
+```
+
+**Champs optionnels (peuvent être omis ou laissés vides):**
+- `departement` (string)
+- `region` (string)
+- `pays` (string)
+- `fax` (string)
+- `code_postal` (string)
+- `ville` (string)
+- `telephone_standard` (string)
+
+**Réponse (201):**
+```json
+{
+  "status": "success",
+  "data": {
+    "hopital": {
+      "id_hopital": "number",
+      "nom": "string",
+      "adresse": "string",
+      "telephone": "string",
+      "type_etablissement": "string",
+      "departement": "string (optionnel)",
+      "region": "string (optionnel)",
+      "pays": "string (optionnel)",
+      "fax": "string (optionnel)",
+      "code_postal": "string (optionnel)",
+      "ville": "string (optionnel)",
+      "telephone_standard": "string (optionnel)",
+      "createdAt": "datetime",
+      "updatedAt": "datetime"
+    }
+  }
+}
+```
+
+#### GET `/api/hopital`
+**Description:** Récupération de tous les hôpitaux
+**Authentification:** Requise
+
+**Réponse (200):**
+```json
+{
+  "status": "success",
+  "results": "number",
+  "data": {
+    "hopitaux": [
+      {
+        "id_hopital": "number",
+        "nom": "string",
+        "adresse": "string",
+        "telephone": "string",
+        "type_etablissement": "string"
+      }
+    ]
+  }
+}
+```
+
+#### GET `/api/hopital/:id`
+**Description:** Récupération d'un hôpital par son ID
+**Authentification:** Requise
+
+**Paramètres:**
+- `id`: ID de l'hôpital
+
+**Réponse (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "hopital": {
+      "id_hopital": "number",
+      "nom": "string",
+      "adresse": "string",
+      "telephone": "string",
+      "type_etablissement": "string"
+    }
+  }
+}
+```
+
+#### PUT `/api/hopital/:id`
+**Description:** Mise à jour d'un hôpital
+**Authentification:** Requise
+**Autorisation:** admin
+
+**Paramètres:**
+- `id`: ID de l'hôpital
+
+**Corps de la requête:**
+```json
+{
+  "nom": "string (requis)",
+  "adresse": "string (requis)",
+  "telephone": "string (requis)",
+  "type_etablissement": "string (requis, enum: Public, Privé, Spécialisé)"
+}
+```
+
+**Réponse (200):**
+```json
+{
+  "status": "success",
+  "data": {
+    "hopital": {
+      "id_hopital": "number",
+      "nom": "string",
+      "adresse": "string",
+      "telephone": "string",
+      "type_etablissement": "string"
+    }
+  }
+}
+```
+
+#### DELETE `/api/hopital/:id`
+**Description:** Suppression d'un hôpital
+**Authentification:** Requise
+**Autorisation:** admin
+
+**Paramètres:**
+- `id`: ID de l'hôpital
+
+**Réponse (204):** Pas de contenu
+
 ## Modèles de Données
 
 ### Utilisateur
@@ -299,7 +439,7 @@ Toutes les routes patients nécessitent une authentification.
   prenom: "string", 
   email: "string (unique)",
   mot_de_passe: "string (haché)",
-  role: "enum (patient, admin, medecin, infirmier, secretaire, laborantin, pharmacien, responsable_etablissement)",
+  role: "enum (admin, secretaire)",
   statut: "enum (actif, inactif, suspendu)",
   telephone: "string",
   date_naissance: "date",
@@ -307,6 +447,26 @@ Toutes les routes patients nécessitent une authentification.
   adresse: "text",
   date_creation: "datetime",
   date_modification: "datetime"
+}
+```
+
+### Hopital
+```javascript
+{
+  id_hopital: "number (PK)",
+  nom: "string",
+  adresse: "string",
+  telephone: "string",
+  type_etablissement: "enum (Public, Privé, Spécialisé)",
+  departement: "string (optionnel)",
+  region: "string (optionnel)",
+  pays: "string (optionnel)",
+  fax: "string (optionnel)",
+  code_postal: "string (optionnel)",
+  ville: "string (optionnel)",
+  telephone_standard: "string (optionnel)",
+  createdAt: "datetime",
+  updatedAt: "datetime"
 }
 ```
 

@@ -334,6 +334,20 @@ module.exports = {
           }
         }
       },
+      mot_de_passe: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
+        comment: 'Mot de passe hashé pour l\'authentification du patient',
+        validate: {
+          notEmpty: {
+            msg: 'Le mot de passe est obligatoire'
+          },
+          len: {
+            args: [8, 255],
+            msg: 'Le mot de passe doit contenir au moins 8 caractères'
+          }
+        }
+      },
       profession: {
         type: DataTypes.STRING(100),
         allowNull: true,
@@ -575,6 +589,7 @@ module.exports = {
     await queryInterface.addIndex('Patients', ['date_naissance']);
     await queryInterface.addIndex('Patients', ['numero_secu'], { unique: true });
     await queryInterface.addIndex('Patients', ['email'], { unique: true });
+    await queryInterface.addIndex('Patients', ['mot_de_passe']);
     await queryInterface.addIndex('Patients', ['telephone']);
     await queryInterface.addIndex('Patients', ['statut']);
   },

@@ -1,5 +1,3 @@
-// src/models/Hopital.js
-
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {

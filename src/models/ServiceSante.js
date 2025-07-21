@@ -1,9 +1,9 @@
+// src/models/ServiceSante.js
+
 const { DataTypes, Op } = require('sequelize');
 
 /**
  * Modèle représentant un service de santé dans l'établissement
- * Un service est une unité organisationnelle (ex: Cardiologie, Pédiatrie, etc.)
- * qui gère des dossiers médicaux et des professionnels de santé.
  */
 module.exports = (sequelize) => {
   const ServiceSante = sequelize.define('ServiceSante', {
@@ -19,9 +19,9 @@ module.exports = (sequelize) => {
       allowNull: false,
       unique: true,
       validate: {
-        notEmpty: true,
-        len: [2, 20],
-        is: /^[A-Z0-9_]+$/
+        notEmpty: { msg: 'Le code du service est obligatoire' },
+        len: { args: [2, 20], msg: 'Le code doit contenir entre 2 et 20 caractères' },
+        is: { args: /^[A-Z0-9_]+$/, msg: 'Le code ne doit contenir que des lettres majuscules, chiffres, tirets et tirets bas' }
       },
       comment: 'Code unique identifiant le service de santé (format: lettres majuscules, chiffres et tirets bas)'
     },
@@ -29,8 +29,8 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(100),
       allowNull: false,
       validate: {
-        notEmpty: true,
-        len: [2, 100]
+        notEmpty: { msg: 'Le nom du service est obligatoire' },
+        len: { args: [2, 100], msg: 'Le nom doit contenir entre 2 et 100 caractères' }
       },
       comment: 'Nom complet du service de santé'
     },
@@ -41,36 +41,46 @@ module.exports = (sequelize) => {
     },
     type_service: {
       type: DataTypes.ENUM(
-        'medecine_generale',
-        'pediatrie',
-        'chirurgie',
-        'urgences',
-        'radiologie',
-        'biologie',
-        'pharmacie',
-        'consultation',
-        'hospitalisation',
-        'autre'
+        'MEDECINE_GENERALE',
+        'PEDIATRIE',
+        'CHIRURGIE',
+        'URGENCES',
+        'CARDIOLOGIE',
+        'NEUROLOGIE',
+        'ONCOLOGIE',
+        'GYNECOLOGIE',
+        'RADIOLOGIE',
+        'BIOLOGIE',
+        'PHARMACIE',
+        'CONSULTATION',
+        'HOSPITALISATION',
+        'REEDUCATION',
+        'SOINS_INTENSIFS',
+        'BLOC_OPERATOIRE',
+        'AUTRE'
       ),
       allowNull: false,
-      defaultValue: 'medecine_generale',
+      defaultValue: 'MEDECINE_GENERALE',
+      validate: {
+        notEmpty: { msg: 'Le type de service est obligatoire' }
+      },
       comment: 'Type de service de santé pour le filtrage et la catégorisation'
     },
     telephone: {
       type: DataTypes.STRING(20),
       allowNull: true,
       validate: {
-        is: /^[0-9+()\- ]+$/,
-        len: [8, 20]
+        is: { args: /^[0-9+()\- ]+$/, msg: 'Numéro de téléphone invalide' },
+        len: { args: [8, 20], msg: 'Le numéro de téléphone doit contenir entre 8 et 20 caractères' }
       },
       comment: 'Numéro de téléphone principal du service'
     },
     email: {
       type: DataTypes.STRING(100),
       allowNull: true,
+      unique: true,
       validate: {
-        isEmail: true,
-        len: [0, 100]
+        isEmail: { msg: 'Veuillez fournir une adresse email valide' }
       },
       comment: 'Adresse email de contact du service'
     },
@@ -85,45 +95,58 @@ module.exports = (sequelize) => {
       onDelete: 'CASCADE',
       comment: 'Référence à l\'hôpital auquel ce service est rattaché'
     },
-    responsable_id: {
+    statut: {
+      type: DataTypes.ENUM('ACTIF', 'INACTIF', 'EN_MAINTENANCE', 'EN_CONSTRUCTION'),
+      defaultValue: 'ACTIF',
+      allowNull: false,
+      validate: {
+        notEmpty: { msg: 'Le statut est obligatoire' }
+      },
+      comment: 'Statut du service pour la gestion du cycle de vie'
+    },
+    horaires_ouverture: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment: 'Horaires d\'ouverture du service (format JSON)'
+    },
+    informations_complementaires: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: {},
+      comment: 'Informations complémentaires structurées'
+    },
+    createdBy: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'ProfessionnelsSante',
-        key: 'id_professionnel'
+        model: 'Utilisateurs',
+        key: 'id_utilisateur',
       },
-      onUpdate: 'SET NULL',
+      onUpdate: 'CASCADE',
       onDelete: 'SET NULL',
-      comment: 'Référence au professionnel de santé responsable du service (chef de service)'
+      comment: 'Utilisateur ayant créé l\'enregistrement'
     },
-    statut: {
-      type: DataTypes.ENUM('actif', 'inactif'),
-      defaultValue: 'actif',
-      allowNull: false,
-      comment: 'Statut du service (actif/inactif) pour la gestion du cycle de vie'
-    }
+    updatedBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'Utilisateurs',
+        key: 'id_utilisateur',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL',
+      comment: 'Dernier utilisateur ayant modifié l\'enregistrement'
+    },
   }, {
     tableName: 'ServicesSante',
     timestamps: true,
     paranoid: true, // Active la suppression douce (soft delete)
     defaultScope: {
-      where: { statut: 'actif' },
-      attributes: { 
+      where: { statut: 'ACTIF' },
+      attributes: {
         exclude: ['createdAt', 'updatedAt', 'deletedAt']
       },
-      include: [
-        {
-          model: sequelize.models.ProfessionnelSante,
-          as: 'responsable',
-          attributes: ['id_professionnel'],
-          include: [
-            {
-              model: sequelize.models.Utilisateur,
-              attributes: ['nom', 'prenom', 'email']
-            }
-          ]
-        }
-      ]
     },
     scopes: {
       // Inclure les services inactifs
@@ -167,9 +190,26 @@ module.exports = (sequelize) => {
               code: service.code,
               hopital_id: service.hopital_id,
               id_service: { [Op.ne]: service.id_service || null }
-            }
+            },
+            paranoid: false // Inclure les services supprimés logiquement dans la vérification d'unicité
           });
-          
+
+          if (existingService) {
+            throw new Error('Un service avec ce code existe déjà dans cet hôpital');
+          }
+        }
+      },
+      beforeUpdate: async (service) => {
+        if (service.code && service.hopital_id) {
+          const existingService = await sequelize.models.ServiceSante.findOne({
+            where: {
+              code: service.code,
+              hopital_id: service.hopital_id,
+              id_service: { [Op.ne]: service.id_service }
+            },
+            paranoid: false
+          });
+
           if (existingService) {
             throw new Error('Un service avec ce code existe déjà dans cet hôpital');
           }
@@ -184,14 +224,14 @@ module.exports = (sequelize) => {
    * @returns {Promise<Array>} Liste des dossiers médicaux
    */
   ServiceSante.prototype.getDossiersMedicaux = async function(options = {}) {
-    return await this.getDossiers({
+    return await this.getDossiersServices({
       include: [
-        { 
+        {
           model: sequelize.models.Patient,
           attributes: ['id_patient', 'nom', 'prenom', 'date_naissance', 'sexe']
         },
-        { 
-          model: sequelize.models.ProfessionnelSante, 
+        {
+          model: sequelize.models.ProfessionnelSante,
           as: 'medecinReferent',
           attributes: ['id_professionnel'],
           include: [
@@ -220,24 +260,18 @@ module.exports = (sequelize) => {
    * @returns {Promise<Array>} Liste des professionnels du service
    */
   ServiceSante.prototype.getProfessionnels = async function(options = {}) {
-    return await this.getProfessionnelsSante({
-      include: [
-        { 
-          model: sequelize.models.Utilisateur,
-          attributes: ['nom', 'prenom', 'email', 'telephone']
-        },
-        {
-          model: sequelize.models.ServiceSante,
-          as: 'servicesSecondaires',
-          attributes: ['id_service', 'nom'],
-          through: { attributes: [] } // Exclure la table de jointure
-        }
-      ],
-      order: [
-        [{ model: sequelize.models.Utilisateur }, 'nom', 'ASC'],
-        [{ model: sequelize.models.Utilisateur }, 'prenom', 'ASC']
-      ],
-      ...options
+    return await this.getProfessionnelsDuService({
+       include: [
+         {
+           model: sequelize.models.Utilisateur,
+           attributes: ['nom', 'prenom', 'email', 'telephone']
+         }
+       ],
+       order: [
+         [{ model: sequelize.models.Utilisateur }, 'nom', 'ASC'],
+         [{ model: sequelize.models.Utilisateur }, 'prenom', 'ASC']
+       ],
+       ...options
     });
   };
 

@@ -1,7 +1,7 @@
 const sequelize = require('../config/database');
 
 // --- Importez tous vos modèles ici ---
-const Utilisateur = require('./Utilisateur')(sequelize); 
+const Utilisateur = require('./Utilisateur')(sequelize);
 const Patient = require('./Patient')(sequelize);
 const ProfessionnelSante = require('./ProfessionnelSante')(sequelize);
 const DossierMedical = require('./DossierMedical')(sequelize);
@@ -51,6 +51,10 @@ Prescription.belongsTo(DossierMedical, { foreignKey: 'dossier_id', as: 'dossier'
 ProfessionnelSante.hasMany(Consultation, { foreignKey: 'professionnel_id', as: 'consultationsEffectuees', onDelete: 'SET NULL' });
 Consultation.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnel' });
 
+// 7.1. ServiceSante et Consultation (One-to-Many)
+ServiceSante.hasMany(Consultation, { foreignKey: 'service_id', as: 'consultationsDuService', onDelete: 'SET NULL' });
+Consultation.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'service' });
+
 // 8. ProfessionnelSante et Prescription (One-to-Many)
 ProfessionnelSante.hasMany(Prescription, { foreignKey: 'professionnel_id', as: 'prescriptionsRedigees', onDelete: 'SET NULL' });
 Prescription.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'redacteur' });
@@ -68,7 +72,6 @@ ProfessionnelSante.hasMany(HistoriqueAccess, { foreignKey: 'professionnel_id', a
 HistoriqueAccess.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnelAccedant' });
 
 // 12. HistoriqueAccess et AutorisationAcces (One-to-One) - si une auto. a 1 historique et vice-versa
-// C'est une relation bidirectionnelle entre un historique et une autorisation spécifique.
 HistoriqueAccess.hasOne(AutorisationAcces, { foreignKey: 'historique_id', as: 'autorisationLiee', onDelete: 'CASCADE' });
 AutorisationAcces.belongsTo(HistoriqueAccess, { foreignKey: 'historique_id', as: 'historique' });
 
@@ -81,29 +84,33 @@ AutorisationAcces.belongsTo(ProfessionnelSante, { foreignKey: 'autorisateur_id',
 Hopital.hasMany(ServiceSante, { foreignKey: 'hopital_id', as: 'services', onDelete: 'CASCADE' });
 ServiceSante.belongsTo(Hopital, { foreignKey: 'hopital_id', as: 'hopital' });
 
-// 15. ServiceSante et ProfessionnelSante (One-to-Many)
+// 15. ServiceSante et ProfessionnelSante (One-to-Many) - Confirmé valide avec service_id sur ProfessionnelSante
 ServiceSante.hasMany(ProfessionnelSante, { foreignKey: 'service_id', as: 'professionnelsDuService', onDelete: 'SET NULL' });
 ProfessionnelSante.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'serviceSante' });
 
+
 // 16. DossierMedical et ProfessionnelSante (pour le médecin référent)
-// Un professionnel de santé peut être le médecin référent de plusieurs dossiers.
-// Un dossier médical a un seul médecin référent.
 ProfessionnelSante.hasMany(DossierMedical, { foreignKey: 'medecin_referent_id', as: 'dossiersSuivis', onDelete: 'SET NULL' });
 DossierMedical.belongsTo(ProfessionnelSante, { foreignKey: 'medecin_referent_id', as: 'medecinReferent' });
 
 // 17. DossierMedical et ServiceSante (pour le service responsable)
-// Un service de santé peut être responsable de plusieurs dossiers.
-// Un dossier médical appartient à un service de santé.
 ServiceSante.hasMany(DossierMedical, { foreignKey: 'service_id', as: 'dossiersServices', onDelete: 'SET NULL' });
 DossierMedical.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'serviceResponsable' });
 
 // 18. DossierMedical et Utilisateur (pour le créateur et le dernier modificateur)
-// Un utilisateur peut créer ou modifier plusieurs dossiers.
 Utilisateur.hasMany(DossierMedical, { foreignKey: 'createdBy', as: 'dossiersCrees', onDelete: 'SET NULL' });
 DossierMedical.belongsTo(Utilisateur, { foreignKey: 'createdBy', as: 'createur' });
 
 Utilisateur.hasMany(DossierMedical, { foreignKey: 'updatedBy', as: 'dossiersModifies', onDelete: 'SET NULL' });
 DossierMedical.belongsTo(Utilisateur, { foreignKey: 'updatedBy', as: 'dernierModificateur' });
+
+// NOUVELLES ASSOCIATIONS pour ServiceSante (createdBy, updatedBy)
+// Un utilisateur peut créer ou modifier plusieurs services.
+Utilisateur.hasMany(ServiceSante, { foreignKey: 'createdBy', as: 'servicesCrees', onDelete: 'SET NULL' });
+ServiceSante.belongsTo(Utilisateur, { foreignKey: 'createdBy', as: 'createurService' });
+
+Utilisateur.hasMany(ServiceSante, { foreignKey: 'updatedBy', as: 'servicesModifies', onDelete: 'SET NULL' });
+ServiceSante.belongsTo(Utilisateur, { foreignKey: 'updatedBy', as: 'dernierModificateurService' });
 
 
 // --- Exportez sequelize et tous les modèles ---

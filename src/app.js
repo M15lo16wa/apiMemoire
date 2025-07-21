@@ -71,7 +71,7 @@ const swaggerDefinition = {
           },
           role: {
             type: 'string',
-            enum: ['admin', 'secretaire', 'visiteur'],
+            enum: ['admin', 'secretaire'],
             description: 'Rôle de l\'utilisateur'
           },
           statut: {
@@ -93,6 +93,42 @@ const swaggerDefinition = {
             type: 'string',
             format: 'date-time',
             description: 'Date de dernière mise à jour'
+          }
+        }
+      },
+      Hopital: {
+        type: 'object',
+        properties: {
+          id_hopital: {
+            type: 'integer',
+            description: 'Identifiant unique de l\'hôpital'
+          },
+          nom: {
+            type: 'string',
+            description: 'Nom officiel de l\'hôpital'
+          },
+          adresse: {
+            type: 'string',
+            description: 'Adresse complète de l\'hôpital'
+          },
+          telephone: {
+            type: 'string',
+            description: 'Numéro de téléphone principal de l\'hôpital'
+          },
+          type_etablissement: {
+            type: 'string',
+            enum: ['Public', 'Privé', 'Spécialisé'],
+            description: 'Type d\'établissement de santé'
+          },
+          createdAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de création de l\'hôpital'
+          },
+          updatedAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de dernière mise à jour de l\'hôpital'
           }
         }
       },

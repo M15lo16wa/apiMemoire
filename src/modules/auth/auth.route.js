@@ -39,8 +39,8 @@ const router = express.Router();
  *               role:
  *                 type: string
  *                 enum: [admin, secretaire, visiteur]
- *                 default: visiteur
- *                 example: "visiteur"
+ *                 default: secretaire
+ *                 example: "secretaire"
  *     responses:
  *       201:
  *         description: Utilisateur créé avec succès
@@ -80,7 +80,7 @@ router.post('/register', authController.register);
  * @swagger
  * /auth/login:
  *   post:
- *     summary: Connexion utilisateur (admin, secretaire, visiteur)
+ *     summary: Connexion utilisateur (admin, secretaire)
  *     tags: [Auth]
  *     requestBody:
  *       required: true

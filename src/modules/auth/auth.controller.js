@@ -18,7 +18,7 @@ exports.register = catchAsync(async (req, res, next) => {
       prenom: req.body.prenom.trim(),
       email: req.body.email.toLowerCase().trim(),
       mot_de_passe: req.body.mot_de_passe,
-      role: ['admin','secretaire','visiteur'].includes(req.body.role) ? req.body.role : 'visiteur',
+      role: ['admin','secretaire'].includes(req.body.role) ? req.body.role : 'secretaire',
       statut: 'actif'
     };
 
@@ -98,7 +98,6 @@ exports.getMe = (req, res, next) => {
                 prenom: req.user.prenom,
                 email: req.user.email,
                 role: req.user.role,
-                // N'exposez pas le mot de passe ni d'autres informations sensibles
             }
         }
     });
