@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const hopitalController = require('./hopitaux.conctroller');
+const hopitalController = require('./hopitaux.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
 
 /**

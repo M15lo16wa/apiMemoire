@@ -4,9 +4,6 @@ const authMiddleware = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
 
-// Appliquer le middleware de protection à toutes les routes ci-dessous
-router.use(authMiddleware.protect);
-
 /**
  * @swagger
  * /patient:
@@ -31,11 +28,11 @@ router.use(authMiddleware.protect);
  *                   items:
  *                     $ref: '#/components/schemas/Patient'
  *       401:
- *         description: Non authentifié (token manquant ou invalide)
+ *         description: Non authentifié
  *       403:
- *         description: Accès refusé (rôle admin requis)
+ *         description: Accès refusé
  *   post:
- *     summary: Création d'un patient
+ *     summary: Création d'un patient (par un médecin ou auto-inscription)
  *     tags: [Patient]
  *     security:
  *       - bearerAuth: []
@@ -45,16 +42,21 @@ router.use(authMiddleware.protect);
  *         application/json:
  *           schema:
  *             type: object
- *             description: >
- *               Les champs 'utilisateur_id' et 'role' sont interdits et provoqueront une erreur 400.
  *             required:
  *               - nom
  *               - prenom
- *               - age
+ *               - date_naissance
+ *               - lieu_naissance
+ *               - civilite
  *               - sexe
+ *               - numero_assure
+ *               - nom_assurance
+ *               - adresse
+ *               - ville
+ *               - pays
  *               - email
  *               - telephone
- *               - ville
+ *               - mot_de_passe
  *             properties:
  *               nom:
  *                 type: string
@@ -62,110 +64,92 @@ router.use(authMiddleware.protect);
  *               prenom:
  *                 type: string
  *                 example: "Jean"
- *               age:
- *                 type: integer
- *                 minimum: 0
- *                 maximum: 150
- *                 example: 35
- *               sexe:
- *                 type: string
- *                 enum: [M, F, Autre, Non précisé]
- *                 example: "M"
- *               email:
- *                 type: string
- *                 format: email
- *                 example: "jean.dupont@email.com"
- *               telephone:
- *                 type: string
- *                 example: "+33123456789"
- *               ville:
- *                 type: string
- *                 example: "Paris"
  *               date_naissance:
  *                 type: string
  *                 format: date
  *                 example: "1988-05-15"
  *               lieu_naissance:
  *                 type: string
- *                 example: "Paris"
+ *                 example: "Dakar"
+ *               civilite:
+ *                 type: string
+ *                 enum: [M., Mme, Mlle]
+ *                 example: "M."
+ *               sexe:
+ *                 type: string
+ *                 enum: [M, F, Autre]
+ *                 example: "M"
+ *               numero_assure:
+ *                 type: string
+ *                 example: "SN123456789"
+ *               nom_assurance:
+ *                 type: string
+ *                 example: "IPRES"
  *               adresse:
  *                 type: string
- *                 example: "123 Rue de la Paix"
- *               code_postal:
+ *                 example: "123 Rue de la République"
+ *               ville:
  *                 type: string
- *                 example: "75001"
+ *                 example: "Dakar"
  *               pays:
  *                 type: string
- *                 example: "France"
+ *                 example: "Sénégal"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "jean.dupont@email.com"
+ *               telephone:
+ *                 type: string
+ *                 example: "+221701234567"
+ *               mot_de_passe:
+ *                 type: string
+ *                 format: password
+ *                 example: "motdepasse123"
+ *               code_postal:
+ *                 type: string
+ *                 example: "10000"
  *               groupe_sanguin:
  *                 type: string
  *                 enum: [A+, A-, B+, B-, AB+, AB-, O+, O-, Inconnu]
  *                 example: "A+"
- *               assurance_maladie:
- *                 type: string
- *                 example: "CPAM"
- *               numero_assurance:
- *                 type: string
- *                 example: "1234567890123"
- *               personne_urgence_nom:
+ *               personne_contact:
  *                 type: string
  *                 example: "Marie Dupont"
- *               personne_urgence_telephone:
+ *               telephone_urgence:
  *                 type: string
- *                 example: "+33123456789"
- *               personne_urgence_lien:
+ *                 example: "+221701234568"
+ *               lien_parente:
  *                 type: string
  *                 example: "Épouse"
  *               profession:
  *                 type: string
  *                 example: "Ingénieur"
- *               situation_familiale:
- *                 type: string
- *                 enum: [Célibataire, Marié(e), Pacsé(e), Divorcé(e), Veuf/Veuve, Union libre, Autre]
- *                 example: "Marié(e)"
- *               nombre_enfants:
- *                 type: integer
- *                 minimum: 0
- *                 example: 2
- *               commentaires:
- *                 type: string
- *                 example: "Allergie aux pénicillines"
+ *              
  *     responses:
  *       201:
- *         description: Patient créé
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   $ref: '#/components/schemas/Patient'
+ *         description: Patient créé avec succès
  *       400:
  *         description: Erreur de validation
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Les champs 'utilisateur_id' et 'role' ne sont pas autorisés"
  *       401:
- *         description: Non authentifié (token manquant ou invalide)
+ *         description: Non authentifié
  *       403:
- *         description: Accès refusé (rôle admin requis)
+ *         description: Accès refusé
  */
-// Routes avec restriction de rôle (exemple)
+
+// Routes principales
 router
   .route('/')
-  .get(authMiddleware.protect, authMiddleware.restrictTo('medecin', 'infirmier','secretaire'), patientController.getAllPatients) // Seuls les medecins, l'infirmier et secrétaires peuvent voir tous les patients
-  .post(authMiddleware.protect, authMiddleware.restrictTo('medecin'), patientController.createPatient); // Seuls les medecins peuvent créer des patients
+  .get(
+    authMiddleware.protect, 
+    authMiddleware.restrictTo('medecin', 'infirmier', 'secretaire', 'admin'), 
+    patientController.getAllPatients
+  ) // Professionnels de santé peuvent voir tous les patients
+  .post(
+    // Route publique pour l'auto-inscription OU route protégée pour création par médecin
+    // Si req.user existe, c'est une création par un professionnel
+    // Si req.user n'existe pas, c'est une auto-inscription
+    patientController.createPatient
+  );
 
 /**
  * @swagger
@@ -185,20 +169,10 @@ router
  *     responses:
  *       200:
  *         description: Détails du patient
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   $ref: '#/components/schemas/Patient'
  *       401:
- *         description: Non authentifié (token manquant ou invalide)
+ *         description: Non authentifié
  *       403:
- *         description: Accès refusé (rôle requis)
+ *         description: Accès refusé
  *       404:
  *         description: Patient non trouvé
  *   patch:
@@ -224,33 +198,21 @@ router
  *                 type: string
  *               prenom:
  *                 type: string
- *               age:
- *                 type: integer
- *               sexe:
- *                 type: string
  *               email:
  *                 type: string
  *               telephone:
+ *                 type: string
+ *               adresse:
  *                 type: string
  *               ville:
  *                 type: string
  *     responses:
  *       200:
  *         description: Patient mis à jour
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   $ref: '#/components/schemas/Patient'
  *       401:
- *         description: Non authentifié (token manquant ou invalide)
+ *         description: Non authentifié
  *       403:
- *         description: Accès refusé (rôle admin ou secretaire requis)
+ *         description: Accès refusé
  *       404:
  *         description: Patient non trouvé
  *   delete:
@@ -269,16 +231,29 @@ router
  *       204:
  *         description: Patient supprimé
  *       401:
- *         description: Non authentifié (token manquant ou invalide)
+ *         description: Non authentifié
  *       403:
- *         description: Accès refusé (rôle admin requis)
+ *         description: Accès refusé
  *       404:
  *         description: Patient non trouvé
  */
+
 router
   .route('/:id')
-  .get(authMiddleware.protect, authMiddleware.restrictTo('medecin', 'secretaire'), patientController.getPatient) // Un patient peut voir son propre dossier (avec la logique dans le contrôleur)
-  .patch(authMiddleware.protect, authMiddleware.restrictTo('medecin', 'secretaire'), patientController.updatePatient)
-  .delete(authMiddleware.protect, authMiddleware.restrictTo('admin'), patientController.deletePatient); // Seuls les admins peuvent supprimer un patient
+  .get(
+    authMiddleware.protect, 
+    authMiddleware.restrictTo('medecin', 'secretaire', 'patient'), 
+    patientController.getPatient
+  ) // Médecin, secrétaire ou le patient lui-même peut voir le dossier
+  .patch(
+    authMiddleware.protect, 
+    authMiddleware.restrictTo('medecin', 'secretaire', 'patient'), 
+    patientController.updatePatient
+  ) // Médecin, secrétaire ou le patient lui-même peut modifier
+  .delete(
+    authMiddleware.protect, 
+    authMiddleware.restrictTo('administrateur'), 
+    patientController.deletePatient
+  ); // Seuls les administrateurs peuvent supprimer
 
 module.exports = router;

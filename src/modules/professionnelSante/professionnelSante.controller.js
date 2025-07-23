@@ -23,17 +23,6 @@ exports.getProfessionnel = catchAsync(async (req, res, next) => {
   });
 });
 
-// Correction de getProfessionnel
-exports.getProfessionnel = catchAsync(async (req, res, next) => {
-  const professionnel = await professionnelSanteService.getProfessionnelById(req.params.id);
-  res.status(200).json({
-    status: 'success',
-    data: {
-      professionnel,
-    },
-  });
-});
-
 
 exports.createProfessionnel = catchAsync(async (req, res, next) => {
   // Assurez-vous que les champs essentiels sont présents

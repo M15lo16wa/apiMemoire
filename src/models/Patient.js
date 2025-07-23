@@ -8,149 +8,140 @@ module.exports = (sequelize) => {
       autoIncrement: true,
       allowNull: false,
     },
-    nom: {
+    numero_dossier: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      validate: {
-        notEmpty: true,
-        len: [2, 50],
-        is: /^[A-Za-zÀ-ÖØ-öø-ÿ\s\-']+$/
-      }
+      unique: true,
+    },
+    nom: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
     },
     prenom: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.STRING(100),
       allowNull: false,
-      validate: {
-        notEmpty: true,
-        len: [2, 50],
-        is: /^[A-Za-zÀ-ÖØ-öø-ÿ\s\-']+$/
-      }
     },
     date_naissance: {
       type: DataTypes.DATEONLY,
       allowNull: false,
-      validate: {
-        isDate: true,
-        isBefore: new Date().toISOString().split('T')[0],
-        notEmpty: true
-      }
     },
     lieu_naissance: {
-      type: DataTypes.STRING(100),
-      allowNull: true
+      type: DataTypes.STRING(255),
+      allowNull: true,
     },
     sexe: {
-      type: DataTypes.ENUM('M', 'F', 'Autre', 'Non précisé'),
+      type: DataTypes.ENUM('M', 'F', 'X', 'I'),
       allowNull: false,
-      defaultValue: 'Non précisé'
+    },
+    civilite: {
+      type: DataTypes.ENUM('M.', 'Mme', 'Mlle', 'Dr', 'Pr'),
+      allowNull: true,
+    },
+    numero_secu: {
+      type: DataTypes.STRING(15),
+      allowNull: true,
+      unique: true,
     },
     adresse: {
       type: DataTypes.STRING(255),
       allowNull: true,
-      validate: {
-        len: [0, 255]
-      }
+    },
+    complement_adresse: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
     },
     code_postal: {
       type: DataTypes.STRING(10),
       allowNull: true,
-      validate: {
-        is: /^[0-9]{5}$/,
-        len: [5, 5]
-      }
     },
     ville: {
       type: DataTypes.STRING(100),
-      allowNull: true
+      allowNull: true,
     },
     pays: {
       type: DataTypes.STRING(100),
-      allowNull: true,
-      defaultValue: 'France'
+      allowNull: false,
+      defaultValue: 'France',
     },
     telephone: {
       type: DataTypes.STRING(20),
       allowNull: true,
-      validate: {
-        is: /^[0-9+()\- ]+$/,
-        len: [8, 20]
-      }
+    },
+    telephone_secondaire: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
     },
     email: {
       type: DataTypes.STRING(100),
       allowNull: true,
       unique: true,
-      validate: {
-        isEmail: true,
-        len: [0, 100]
-      }
     },
-    age: {
-      type: DataTypes.INTEGER,
+    mot_de_passe: {
+      type: DataTypes.STRING(255),
       allowNull: false,
-      validate: {
-        min: 0,
-        max: 150
-      }
     },
-    numero_securite_sociale: {
-      type: DataTypes.STRING(21),
+    profession: {
+      type: DataTypes.STRING(100),
       allowNull: true,
-      unique: true,
-      validate: {
-        is: /^[0-9 ]+$/,
-        len: [15, 21]
-      }
     },
     groupe_sanguin: {
       type: DataTypes.ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Inconnu'),
       allowNull: false,
-      defaultValue: 'Inconnu'
+      defaultValue: 'Inconnu',
     },
-    assurance_maladie: {
-      type: DataTypes.STRING(100),
-      allowNull: true
-    },
-    numero_assurance: {
-      type: DataTypes.STRING(50),
-      allowNull: true
-    },
-    personne_urgence_nom: {
-      type: DataTypes.STRING(100),
-      allowNull: true
-    },
-    personne_urgence_telephone: {
-      type: DataTypes.STRING(20),
+    poids: {
+      type: DataTypes.DECIMAL(5, 2),
       allowNull: true,
-      validate: {
-        is: /^[0-9+()\- ]+$/,
-        len: [8, 20]
-      }
     },
-    personne_urgence_lien: {
-      type: DataTypes.STRING(50),
-      allowNull: true
-    },
-    profession: {
-      type: DataTypes.STRING(100),
-      allowNull: true
-    },
-    situation_familiale: {
-      type: DataTypes.ENUM('Célibataire', 'Marié(e)', 'Pacsé(e)', 'Divorcé(e)', 'Veuf/Veuve', 'Union libre', 'Autre'),
-      allowNull: true
-    },
-    nombre_enfants: {
+    taille: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      defaultValue: 0,
-      validate: {
-        min: 0
-      }
     },
-    commentaires: {
+    photo: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    assure: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    nom_assurance: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    numero_assure: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    date_premiere_consultation: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
+    date_derniere_consultation: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+    },
+    personne_contact: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    telephone_urgence: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
+    lien_parente: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    notes: {
       type: DataTypes.TEXT,
-      allowNull: true
+      allowNull: true,
     },
+    // commentaires: {
+    //   type: DataTypes.TEXT,
+    //   allowNull: true,
+    // },
     statut: {
       type: DataTypes.ENUM('actif', 'inactif', 'décédé'),
       defaultValue: 'actif',
@@ -164,18 +155,18 @@ module.exports = (sequelize) => {
         len: [8, 255]
       }
     },
-    // Clé étrangère vers Utilisateur (compte associé)
-    utilisateur_id: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Utilisateurs',
-        key: 'id_utilisateur'
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL'
-    }
+    // La relation avec Utilisateur est gérée via createdBy et updatedBy
   }, {
+    hooks: {
+      beforeCreate: async (patient) => {
+        if (!patient.numero_dossier) {
+          // Générer un numéro de dossier unique basé sur la date et un nombre aléatoire
+          const date = new Date();
+          const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 chiffres aléatoires
+          patient.numero_dossier = `PAT-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}-${randomNum}`;
+        }
+      }
+    },
     tableName: 'Patients',
     timestamps: true,
     paranoid: true, // Active la suppression douce (soft delete)
@@ -224,19 +215,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Méthode d'instance pour obtenir l'âge du patient
-  Patient.prototype.getAge = function() {
-    if (!this.date_naissance) return null;
-    const today = new Date();
-    const birthDate = new Date(this.date_naissance);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
 
   // Méthode d'instance pour obtenir le nom complet
   Patient.prototype.getFullName = function() {

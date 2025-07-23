@@ -23,9 +23,7 @@ RendezVous.belongsTo(Hopital, { foreignKey: 'id_hopital' });
 RendezVous.belongsTo(ServiceSante, { foreignKey: 'id_service' });
 RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'id_medecin', allowNull: true });
 
-// 1. Utilisateur et Patient (One-to-One)
-Utilisateur.hasOne(Patient, { foreignKey: 'utilisateur_id', as: 'patientLie', onDelete: 'SET NULL' });
-Patient.belongsTo(Utilisateur, { foreignKey: 'utilisateur_id', as: 'compteUtilisateur' });
+// 1. Aucune relation directe entre Utilisateur et Patient selon le diagramme
 
 // 2. Utilisateur et ProfessionnelSante (One-to-One)
 Utilisateur.hasOne(ProfessionnelSante, { foreignKey: 'utilisateur_id', as: 'professionnelLie', onDelete: 'SET NULL' });
