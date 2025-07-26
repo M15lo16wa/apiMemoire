@@ -108,3 +108,120 @@ exports.prendreRendezVous = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+/**
+ * Créer un rappel pour un patient
+ */
+exports.creerRappel = catchAsync(async (req, res, next) => {
+  const { patient_id, id_medecin, date_rappel, message, type_rappel, rendez_vous_id } = req.body;
+  
+  if (!patient_id || !date_rappel || !message) {
+    return next(new AppError('Veuillez fournir patient_id, date_rappel et message', 400));
+  }
+  
+  const rappel = await rendezVousService.creerRappel(req.body);
+  
+  res.status(201).json({
+    status: 'success',
+    data: {
+      rappel
+    }
+  });
+});
+
+/**
+ * Récupérer les rappels d'un patient
+ */
+exports.getRappelsByPatient = catchAsync(async (req, res, next) => {
+  const { patient_id } = req.params;
+  const { type_rappel, date_debut, date_fin } = req.query;
+  
+  const filters = {};
+  if (type_rappel) filters.type_rappel = type_rappel;
+  if (date_debut || date_fin) {
+    filters.DateHeure = {};
+    if (date_debut) filters.DateHeure[Op.gte] = new Date(date_debut);
+    if (date_fin) filters.DateHeure[Op.lte] = new Date(date_fin);
+  }
+  
+  const rappels = await rendezVousService.getRappelsByPatient(patient_id, filters);
+  
+  res.status(200).json({
+    status: 'success',
+    results: rappels.length,
+    data: {
+      rappels
+    }
+  });
+});
+
+/**
+ * Récupérer les rendez-vous à venir d'un patient
+ */
+exports.getRendezVousAVenir = catchAsync(async (req, res, next) => {
+  const { patient_id } = req.params;
+  const { limit } = req.query;
+  
+  const rendezVous = await rendezVousService.getRendezVousAVenir(patient_id, limit ? parseInt(limit) : 10);
+  
+  res.status(200).json({
+    status: 'success',
+    results: rendezVous.length,
+    data: {
+      rendezVous
+    }
+  });
+});
+
+/**
+ * Annuler un rendez-vous
+ */
+exports.annulerRendezVous = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { motif } = req.body;
+  
+  if (!motif) {
+    return next(new AppError('Le motif d\'annulation est requis', 400));
+  }
+  
+  const rendezVousAnnule = await rendezVousService.annulerRendezVous(id, motif);
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      rendezVous: rendezVousAnnule
+    }
+  });
+});
+
+/**
+ * Récupérer les rappels à envoyer (pour un service de notification)
+ */
+exports.getRappelsAEnvoyer = catchAsync(async (req, res, next) => {
+  const { date_limite } = req.query;
+  const dateLimite = date_limite ? new Date(date_limite) : new Date();
+  
+  const rappels = await rendezVousService.getRappelsAEnvoyer(dateLimite);
+  
+  res.status(200).json({
+    status: 'success',
+    results: rappels.length,
+    data: {
+      rappels
+    }
+  });
+});
+
+/**
+ * Marquer un rappel comme envoyé
+ */
+exports.marquerRappelEnvoye = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  
+  await rendezVousService.marquerRappelEnvoye(id);
+  
+  res.status(200).json({
+    status: 'success',
+    message: 'Rappel marqué comme envoyé'
+  });
+});

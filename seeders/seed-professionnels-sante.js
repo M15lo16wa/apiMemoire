@@ -42,18 +42,6 @@ async function seed() {
         const nom = noms[compteur % noms.length];
         const email = await generateUniqueEmail(prenom, nom, service, compteur);
         const mot_de_passe = 'Test@1234';
-        // Vérifier si l'utilisateur existe déjà
-        let utilisateur = await Utilisateur.findOne({ where: { email } });
-        if (!utilisateur) {
-          utilisateur = await Utilisateur.create({
-            nom,
-            prenom,
-            email,
-            mot_de_passe,
-            role: 'secretaire', // Toujours 'secretaire' pour la plateforme
-            statut: 'actif'
-          });
-        }
         // Vérifier si le professionnel existe déjà
         let professionnel = await ProfessionnelSante.findOne({ where: { email } });
         if (!professionnel) {

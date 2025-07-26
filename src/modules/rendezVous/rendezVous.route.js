@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const rendezVousController = require('./rendezVous.controller');
-const authMiddleware = require('../../middlewares/auth.middleware');
 const { body } = require('express-validator');
+const rendezVousController = require('./rendezVous.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
+const { authenticateToken } = require('../../middlewares/auth.middleware');
 
 /**
  * @swagger
@@ -12,20 +12,26 @@ const { handleValidationErrors } = require('../../middlewares/validation.middlew
  *   description: Gestion des rendez-vous
  */
 
-// Validation pour la création et la mise à jour d'un rendez-vous
+// Validation rules pour les rendez-vous
 const rendezVousValidationRules = [
-  body('nom').notEmpty().withMessage('Le nom est requis').isString(),
-  body('prenom').notEmpty().withMessage('Le prénom est requis').isString(),
-  body('email').notEmpty().withMessage('L\'email est requis').isEmail().withMessage('Email invalide'),
-  body('dateNaissance').notEmpty().withMessage('La date de naissance est requise').isDate().withMessage('Format de date invalide'),
-  body('sexe').notEmpty().withMessage('Le sexe est requis').isIn(['Masculin', 'Feminin', 'Autre', 'Inconnu']).withMessage('Valeur invalide pour le sexe'),
-  body('telephone').notEmpty().withMessage('Le téléphone est requis').isString(),
-  body('DateHeure').notEmpty().withMessage('La date et l\'heure sont requises').isISO8601().withMessage('Format de date/heure invalide'),
-  body('motif_consultation').notEmpty().withMessage('Le motif de consultation est requis').isString(),
-  body('id_hopital').notEmpty().withMessage('L\'ID de l\'hôpital est requis').isInt().withMessage('L\'ID de l\'hôpital doit être un nombre entier'),
-  body('id_service').notEmpty().withMessage('L\'ID du service est requis').isInt().withMessage('L\'ID du service doit être un nombre entier'),
-  body('numero_assure').notEmpty().withMessage('Le numéro d\'assuré est requis').isString(),
-  body('assureur').notEmpty().withMessage('L\'assureur est requis').isString()
+    body('DateHeure').notEmpty().withMessage('La date et heure sont requises').isISO8601(),
+    body('motif_consultation').notEmpty().withMessage('Le motif de consultation est requis').isLength({ max: 500 }),
+    body('patient_id').optional().isInt().withMessage('L\'ID du patient doit être un entier'),
+    body('id_medecin').optional().isInt().withMessage('L\'ID du médecin doit être un entier'),
+    body('id_service').optional().isInt().withMessage('L\'ID du service doit être un entier'),
+    body('id_hopital').optional().isInt().withMessage('L\'ID de l\'hôpital doit être un entier'),
+    body('duree').optional().isInt({ min: 15, max: 480 }).withMessage('La durée doit être entre 15 et 480 minutes'),
+    body('statut').optional().isIn(['Planifié', 'Confirmé', 'En cours', 'Terminé', 'Annulé'])
+];
+
+// Validation rules pour les rappels
+const rappelValidationRules = [
+    body('patient_id').notEmpty().withMessage('L\'ID du patient est requis').isInt(),
+    body('date_rappel').notEmpty().withMessage('La date du rappel est requise').isISO8601(),
+    body('message').notEmpty().withMessage('Le message est requis').isLength({ max: 500 }),
+    body('id_medecin').optional().isInt().withMessage('L\'ID du médecin doit être un entier'),
+    body('type_rappel').optional().isIn(['general', 'medicament', 'examen', 'consultation']),
+    body('rendez_vous_id').optional().isInt().withMessage('L\'ID du rendez-vous doit être un entier')
 ];
 
 /**
@@ -301,14 +307,79 @@ const rendezVousValidationRules = [
  *         description: Erreur serveur
  */
 
-// Routes publiques
-router.post('/', rendezVousValidationRules, handleValidationErrors, rendezVousController.createRendezVous);
-router.post('/prendre', rendezVousValidationRules, handleValidationErrors, rendezVousController.prendreRendezVous);
+// Routes CRUD de base
+router.post('/', 
+    authenticateToken, 
+    rendezVousValidationRules, 
+    handleValidationErrors, 
+    rendezVousController.createRendezVous
+);
 
-// Routes protégées
-router.get('/', authMiddleware.protect, rendezVousController.getAllRendezVous);
-router.get('/:id', authMiddleware.protect, rendezVousController.getRendezVousById);
-router.put('/:id', authMiddleware.protect, rendezVousController.updateRendezVous);
-router.delete('/:id', authMiddleware.protect, rendezVousController.deleteRendezVous);
+router.get('/', 
+    authenticateToken, 
+    rendezVousController.getAllRendezVous
+);
+
+router.get('/:id', 
+    authenticateToken, 
+    rendezVousController.getRendezVousById
+);
+
+router.put('/:id', 
+    authenticateToken, 
+    rendezVousValidationRules, 
+    handleValidationErrors, 
+    rendezVousController.updateRendezVous
+);
+
+router.delete('/:id', 
+    authenticateToken, 
+    rendezVousController.deleteRendezVous
+);
+
+// Route spécialisée pour prendre un rendez-vous
+router.post('/prendre', 
+    authenticateToken, 
+    rendezVousValidationRules, 
+    handleValidationErrors, 
+    rendezVousController.prendreRendezVous
+);
+
+// Routes pour les rappels
+router.post('/rappel', 
+    authenticateToken, 
+    rappelValidationRules, 
+    handleValidationErrors, 
+    rendezVousController.creerRappel
+);
+
+router.get('/patient/:patient_id/rappels', 
+    authenticateToken, 
+    rendezVousController.getRappelsByPatient
+);
+
+router.get('/patient/:patient_id/avenir', 
+    authenticateToken, 
+    rendezVousController.getRendezVousAVenir
+);
+
+// Routes pour l'annulation
+router.patch('/:id/annuler', 
+    authenticateToken, 
+    [body('motif').notEmpty().withMessage('Le motif d\'annulation est requis').isLength({ max: 500 })], 
+    handleValidationErrors, 
+    rendezVousController.annulerRendezVous
+);
+
+// Routes pour la gestion des rappels (interne)
+router.get('/rappels/a-envoyer', 
+    authenticateToken, 
+    rendezVousController.getRappelsAEnvoyer
+);
+
+router.patch('/rappel/:id/envoye', 
+    authenticateToken, 
+    rendezVousController.marquerRappelEnvoye
+);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 // src/modules/dossierMedical/dossierMedical.service.js
 
-const { DossierMedical, Patient, ProfessionnelSante, Utilisateur, ServiceSante } = require('../../models');
+const { DossierMedical, Patient, ProfessionnelSante, Utilisateur, ServiceSante, Prescription, ExamenLabo, Consultation } = require('../../models');
 const { Op } = require('sequelize');
 
 const dossierMedicalService = {
@@ -187,6 +187,208 @@ async getDossiersByPatientId(patientId, includes = []) {
         throw new Error('Impossible de récupérer les dossiers médicaux du patient.');
     }
 },
+
+/**
+ * Récupère le dossier médical complet d'un patient avec toutes les informations nécessaires au partage
+ * @param {number} patientId - L'ID du patient
+ * @returns {Promise<object>} Le dossier médical complet avec toutes les informations
+ */
+async getDossierCompletPatient(patientId) {
+    try {
+        // Récupérer le dossier médical principal
+        const dossier = await DossierMedical.findOne({
+            where: { patient_id: patientId },
+            include: [
+                { model: Patient, as: 'patient' },
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'medecinReferent',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                },
+                { model: ServiceSante, as: 'serviceResponsable' }
+            ]
+        });
+
+        if (!dossier) {
+            throw new Error('Dossier médical non trouvé pour ce patient.');
+        }
+
+        // Récupérer les prescriptions actives
+        const prescriptions = await Prescription.findAll({
+            where: { 
+                patient_id: patientId,
+                statut: 'active'
+            },
+            include: [
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'redacteur',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ],
+            order: [['datePrescription', 'DESC']]
+        });
+
+        // Récupérer les résultats d'examen récents
+        const examens = await ExamenLabo.findAll({
+            where: { 
+                patient_id: patientId,
+                statut: 'valide'
+            },
+            include: [
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'professionnel',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ],
+            order: [['date_examen', 'DESC']],
+            limit: 10 // Limiter aux 10 derniers examens
+        });
+
+        // Récupérer les consultations récentes
+        const consultations = await Consultation.findAll({
+            where: { dossier_id: dossier.id_dossier },
+            include: [
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'professionnel',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ],
+            order: [['date_consultation', 'DESC']],
+            limit: 5 // Limiter aux 5 dernières consultations
+        });
+
+        // Récupérer les demandes d'examen en attente
+        const demandesEnAttente = await Prescription.findAll({
+            where: { 
+                patient_id: patientId,
+                prescrit_traitement: false, // Demandes d'examen
+                statut: 'en_attente'
+            },
+            include: [
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'redacteur',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ],
+            order: [['datePrescription', 'DESC']]
+        });
+
+        // Récupérer les résultats d'examen anormaux récents
+        const resultatsAnormaux = await ExamenLabo.findAll({
+            where: { 
+                patient_id: patientId,
+                resultat: 'anormal',
+                statut: 'valide'
+            },
+            include: [
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'professionnel',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ],
+            order: [['date_examen', 'DESC']],
+            limit: 5
+        });
+
+        // Construire le dossier complet
+        const dossierComplet = {
+            dossier: dossier,
+            prescriptions_actives: prescriptions,
+            examens_recents: examens,
+            consultations_recentes: consultations,
+            demandes_en_attente: demandesEnAttente,
+            resultats_anormaux: resultatsAnormaux,
+            resume: {
+                nombre_prescriptions_actives: prescriptions.length,
+                nombre_examens_recents: examens.length,
+                nombre_consultations_recentes: consultations.length,
+                nombre_demandes_en_attente: demandesEnAttente.length,
+                nombre_resultats_anormaux: resultatsAnormaux.length
+            }
+        };
+
+        return dossierComplet;
+    } catch (error) {
+        console.error(`Erreur lors de la récupération du dossier complet pour le patient ${patientId}:`, error);
+        throw new Error('Impossible de récupérer le dossier médical complet.');
+    }
+},
+
+/**
+ * Récupère un résumé des informations médicales d'un patient
+ * @param {number} patientId - L'ID du patient
+ * @returns {Promise<object>} Le résumé des informations médicales
+ */
+async getResumePatient(patientId) {
+    try {
+        // Compter les différents types d'informations
+        const [prescriptionsCount, examensCount, consultationsCount] = await Promise.all([
+            Prescription.count({ where: { patient_id: patientId, statut: 'active' } }),
+            ExamenLabo.count({ where: { patient_id: patientId, statut: 'valide' } }),
+            Consultation.count({ 
+                include: [{ model: DossierMedical, as: 'dossier', where: { patient_id: patientId } }]
+            })
+        ]);
+
+        // Récupérer les dernières activités
+        const dernierePrescription = await Prescription.findOne({
+            where: { patient_id: patientId },
+            order: [['datePrescription', 'DESC']],
+            include: [
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'redacteur',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ]
+        });
+
+        const dernierExamen = await ExamenLabo.findOne({
+            where: { patient_id: patientId, statut: 'valide' },
+            order: [['date_examen', 'DESC']],
+            include: [
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'professionnel',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ]
+        });
+
+        const derniereConsultation = await Consultation.findOne({
+            include: [
+                { model: DossierMedical, as: 'dossier', where: { patient_id: patientId } },
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'professionnel',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ],
+            order: [['date_consultation', 'DESC']]
+        });
+
+        return {
+            resume: {
+                prescriptions_actives: prescriptionsCount,
+                examens_valides: examensCount,
+                consultations_total: consultationsCount
+            },
+            dernieres_activites: {
+                derniere_prescription: dernierePrescription,
+                dernier_examen: dernierExamen,
+                derniere_consultation: derniereConsultation
+            }
+        };
+    } catch (error) {
+        console.error(`Erreur lors de la récupération du résumé pour le patient ${patientId}:`, error);
+        throw new Error('Impossible de récupérer le résumé du patient.');
+    }
+}
 };
 
 module.exports = dossierMedicalService;

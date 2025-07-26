@@ -1,6 +1,7 @@
 const express = require('express');
 const professionnelSanteController = require('./professionnelSante.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
+const medAuth = require('../../middlewares/medAuh');
 
 const router = express.Router();
 
@@ -253,4 +254,94 @@ router.route('/:id')
   .patch(authMiddleware.protect, authMiddleware.restrictTo('admin'), professionnelSanteController.updateProfessionnel)
   .delete(authMiddleware.protect, authMiddleware.restrictTo('admin'), professionnelSanteController.deleteProfessionnel);
 
-module.exports = router; 
+/**
+ * @swagger
+ * /professionnelSante/auth/login:
+ *   post:
+ *     summary: Connexion d'un médecin avec numéro ADELI et mot de passe
+ *     tags: [ProfessionnelSante]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - numero_adeli
+ *               - mot_de_passe
+ *             properties:
+ *               numero_adeli:
+ *                 type: string
+ *                 example: "123456789"
+ *               mot_de_passe:
+ *                 type: string
+ *                 example: "motdepasse123"
+ *     responses:
+ *       200:
+ *         description: Connexion réussie
+ *       401:
+ *         description: Numéro ADELI ou mot de passe incorrect
+ */
+router.post('/auth/login', professionnelSanteController.login);
+
+/**
+ * @swagger
+ * /professionnelSante/auth/logout:
+ *   post:
+ *     summary: Déconnexion d'un médecin
+ *     tags: [ProfessionnelSante]
+ *     responses:
+ *       200:
+ *         description: Déconnexion réussie
+ */
+router.post('/auth/logout', professionnelSanteController.logout);
+
+/**
+ * @swagger
+ * /professionnelSante/auth/me:
+ *   get:
+ *     summary: Récupérer le profil du médecin connecté
+ *     tags: [ProfessionnelSante]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profil du médecin
+ *       401:
+ *         description: Non authentifié
+ */
+router.get('/auth/me', medAuth, professionnelSanteController.getMe);
+
+/**
+ * @swagger
+ * /professionnelSante/auth/change-password:
+ *   post:
+ *     summary: Changer le mot de passe du médecin
+ *     tags: [ProfessionnelSante]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mot_de_passe_actuel
+ *               - nouveau_mot_de_passe
+ *             properties:
+ *               mot_de_passe_actuel:
+ *                 type: string
+ *                 example: "ancienMotDePasse123"
+ *               nouveau_mot_de_passe:
+ *                 type: string
+ *                 example: "nouveauMotDePasse456"
+ *     responses:
+ *       200:
+ *         description: Mot de passe changé avec succès
+ *       401:
+ *         description: Mot de passe actuel incorrect
+ */
+router.post('/auth/change-password', medAuth, professionnelSanteController.changePassword);
+
+module.exports = router;

@@ -57,6 +57,9 @@ exports.protect = catchAsync(async (req, res, next) => {
   next();
 });
 
+// Alias pour authenticateToken (compatibilité avec les modules existants)
+exports.authenticateToken = exports.protect;
+
 // Middleware pour restreindre l'accès en fonction des rôles
 exports.restrictTo = (...roles) => {
   return (req, res, next) => {

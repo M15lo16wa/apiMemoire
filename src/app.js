@@ -30,9 +30,9 @@ app.use('/api', apiRoutes);
 const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
-    title: 'API Gestion Hospitalière',
+    title: 'API Gestion Hospitalière - Partage Patient-Médecin',
     version: '1.0.0',
-    description: 'Documentation interactive de l\'API du système de gestion hospitalière',
+    description: 'Documentation interactive de l\'API du système de gestion hospitalière avec fonctionnalités de partage patient-médecin',
   },
   servers: [
     {
@@ -178,6 +178,14 @@ const swaggerDefinition = {
           numero_licence: {
             type: 'string',
             description: 'Numéro de licence professionnelle'
+          },
+          numero_adeli: {
+            type: 'string',
+            description: 'Numéro ADELI pour l\'authentification'
+          },
+          mot_de_passe: {
+            type: 'string',
+            description: 'Mot de passe hashé (non visible dans les réponses)'
           },
           statut: {
             type: 'string',
@@ -416,6 +424,170 @@ const swaggerDefinition = {
           motif_fermeture: {
             type: 'string',
             description: 'Raison de la fermeture du dossier'
+          },
+          createdAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de création'
+          },
+          updatedAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de dernière mise à jour'
+          }
+        }
+      },
+      Prescription: {
+        type: 'object',
+        properties: {
+          id_prescription: {
+            type: 'integer',
+            description: 'Identifiant unique de la prescription'
+          },
+          patient_id: {
+            type: 'integer',
+            description: 'ID du patient'
+          },
+          professionnel_id: {
+            type: 'integer',
+            description: 'ID du professionnel de santé'
+          },
+          medicament: {
+            type: 'string',
+            description: 'Nom du médicament ou type d\'examen'
+          },
+          dosage: {
+            type: 'string',
+            description: 'Dosage ou paramètres d\'examen'
+          },
+          frequence: {
+            type: 'string',
+            description: 'Fréquence de prise ou urgence'
+          },
+          duree: {
+            type: 'string',
+            description: 'Durée du traitement'
+          },
+          instructions: {
+            type: 'string',
+            description: 'Instructions spéciales'
+          },
+          prescrit_traitement: {
+            type: 'boolean',
+            description: 'True pour ordonnance, False pour demande d\'examen'
+          },
+          statut: {
+            type: 'string',
+            enum: ['active', 'suspendue', 'terminee', 'annulee', 'en_attente'],
+            description: 'Statut de la prescription'
+          },
+          renouvelable: {
+            type: 'boolean',
+            description: 'Si la prescription est renouvelable'
+          },
+          nb_renouvellements: {
+            type: 'integer',
+            description: 'Nombre de renouvellements autorisés'
+          },
+          createdAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de création'
+          },
+          updatedAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de dernière mise à jour'
+          }
+        }
+      },
+      ExamenLabo: {
+        type: 'object',
+        properties: {
+          id_examen: {
+            type: 'integer',
+            description: 'Identifiant unique de l\'examen'
+          },
+          patient_id: {
+            type: 'integer',
+            description: 'ID du patient'
+          },
+          professionnel_id: {
+            type: 'integer',
+            description: 'ID du professionnel de santé'
+          },
+          type_examen: {
+            type: 'string',
+            description: 'Type d\'examen de laboratoire'
+          },
+          resultat: {
+            type: 'string',
+            enum: ['normal', 'anormal', 'limite'],
+            description: 'Résultat de l\'examen'
+          },
+          valeur_normale: {
+            type: 'string',
+            description: 'Valeurs normales de référence'
+          },
+          commentaire: {
+            type: 'string',
+            description: 'Commentaires sur le résultat'
+          },
+          statut: {
+            type: 'string',
+            enum: ['en_attente', 'valide', 'rejete'],
+            description: 'Statut de validation'
+          },
+          date_examen: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de réalisation de l\'examen'
+          },
+          createdAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de création'
+          },
+          updatedAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de dernière mise à jour'
+          }
+        }
+      },
+      RendezVous: {
+        type: 'object',
+        properties: {
+          id_rendez_vous: {
+            type: 'integer',
+            description: 'Identifiant unique du rendez-vous'
+          },
+          patient_id: {
+            type: 'integer',
+            description: 'ID du patient'
+          },
+          id_medecin: {
+            type: 'integer',
+            description: 'ID du médecin'
+          },
+          DateHeure: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date et heure du rendez-vous'
+          },
+          motif_consultation: {
+            type: 'string',
+            description: 'Motif de la consultation'
+          },
+          statut: {
+            type: 'string',
+            enum: ['Planifié', 'Confirmé', 'En cours', 'Terminé', 'Annulé', 'Rappel'],
+            description: 'Statut du rendez-vous'
+          },
+          type_rappel: {
+            type: 'string',
+            enum: ['general', 'medicament', 'examen', 'consultation'],
+            description: 'Type de rappel (si applicable)'
           },
           createdAt: {
             type: 'string',

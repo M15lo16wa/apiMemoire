@@ -64,7 +64,7 @@ exports.logout = (req, res) => {
 
 // Exemple de route protégée pour tester l'authentification
 // Changement de mot de passe pour patient
-const patientAuthService = require('./patient-auth.service');
+const patientAuthService = require('../patient/patient.auth.service');
 
 exports.changePassword = catchAsync(async (req, res, next) => {
   const patientId = req.user && req.user.id_patient;

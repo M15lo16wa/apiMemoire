@@ -113,6 +113,17 @@ module.exports = (sequelize) => {
       allowNull: true,
       unique: true
     },
+    numero_adeli: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      unique: true,
+      comment: 'Numéro ADELI pour les professionnels de santé'
+    },
+    mot_de_passe: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      comment: 'Mot de passe hashé pour l\'authentification directe'
+    },
     date_obtention_licence: {
       type: DataTypes.DATEONLY,
       allowNull: true,
@@ -178,14 +189,17 @@ module.exports = (sequelize) => {
     paranoid: true, // Active la suppression douce (soft delete)
     defaultScope: {
       where: { statut: 'actif' },
-      attributes: { exclude: ['createdAt', 'updatedAt', 'deletedAt'] }
+      attributes: { exclude: ['createdAt', 'updatedAt', 'deletedAt', 'mot_de_passe'] }
     },
     scopes: {
       withInactifs: {
         where: {}
       },
       withSensitiveData: {
-        attributes: { include: ['numero_licence'] }
+        attributes: { include: ['numero_licence', 'numero_adeli'] }
+      },
+      withPassword: {
+        attributes: { include: ['mot_de_passe'] }
       },
       parService: (serviceId) => ({
         where: { service_id: serviceId }

@@ -2,9 +2,19 @@ const { Patient } = require('../../models');
 const AppError = require('../../utils/appError');
 const bcrypt = require('bcryptjs');
 
+
+// Fonction de génération du numéro de dossier
+const generateNumeroDossier = async () => {
+  const count = await Patient.count();
+  const date = new Date();
+  const year = date.getFullYear();
+  return `PAT${year}${String(count + 1).padStart(4, '0')}`; 
+};
+
 exports.getAllPatients = async () => {
-  const Patients = await Patient.findAll();
-  return Patients;
+  // const Patients = await Patient.findAll();
+  // return Patients;
+  return await Patient.findAll();
 };
 
 exports.getPatientById = async (id) => {
@@ -13,13 +23,6 @@ exports.getPatientById = async (id) => {
     throw new AppError('Patient not found with that ID', 404);
   }
   return Patients;
-};
-
-const generateNumeroDossier = async () => {
-  const count = await Patient.count();
-  const date = new Date();
-  const year = date.getFullYear();
-  return `PAT${year}${String(count + 1).padStart(4, '0')}`;
 };
 
 exports.createPatient = async (patientData) => {
@@ -39,29 +42,33 @@ exports.createPatient = async (patientData) => {
 
   // Vérifier si un patient avec le même email existe déjà
   if (patientData.email) {
-      const existingPatientByEmail = await Patient.findOne({
-        where: { email: patientData.email }
-      });
-      if (existingPatientByEmail) {
-        throw new AppError('Un patient avec cet email existe déjà.', 400);
-      }
+    const existingPatientByEmail = await Patient.findOne({
+      where: { email: patientData.email }
+    });
+    if (existingPatientByEmail) {
+      throw new AppError('Un patient avec cet email existe déjà.', 400);
+    }
   }
 
   // Vérifier si un patient avec le même numéro d'assuré existe déjà
   if (patientData.numero_assure) {
-      const existingPatientByNumero = await Patient.findOne({
-        where: { numero_assure: patientData.numero_assure }
-      });
-      if (existingPatientByNumero) {
-        throw new AppError('Un patient avec ce numéro d\'assuré existe déjà.', 400);
-      }
+    const existingPatientByNumero = await Patient.findOne({
+      where: { numero_assure: patientData.numero_assure }
+    });
+    if (existingPatientByNumero) {
+      throw new AppError('Un patient avec ce numéro d\'assuré existe déjà.', 400);
+    }
   }
 
   // Hasher le mot de passe
   const hashedPassword = await bcrypt.hash(patientData.mot_de_passe, 12);
 
+  // Générer un numéro de dossier unique
+  const numeroDossier = await generateNumeroDossier();
+
   // Préparer les données patient avec tous les champs requis
   const completePatientData = {
+    numero_dossier: numeroDossier,
     nom: patientData.nom,
     prenom: patientData.prenom,
     date_naissance: patientData.date_naissance,

@@ -3,14 +3,12 @@
 const dossierMedicalService = require('./dossierMedical.service');
 const { validationResult } = require('express-validator');
 
-const dossierMedicalController = {
-
 /**
-   * Crée un nouveau dossier médical.
-   * @param {object} req - L'objet de requête Express.
-   * @param {object} res - L'objet de réponse Express.
-   */
-async createDossier(req, res) {
+ * Crée un nouveau dossier médical.
+ * @param {object} req - L'objet de requête Express.
+ * @param {object} res - L'objet de réponse Express.
+ */
+exports.createDossier = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -37,14 +35,14 @@ async createDossier(req, res) {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-},
+};
 
 /**
-   * Récupère tous les dossiers médicaux.
-   * @param {object} req - L'objet de requête Express.
-   * @param {object} res - L'objet de réponse Express.
-   */
-async getAllDossiers(req, res) {
+ * Récupère tous les dossiers médicaux.
+ * @param {object} req - L'objet de requête Express.
+ * @param {object} res - L'objet de réponse Express.
+ */
+exports.getAllDossiers = async (req, res) => {
     try {
         const { patientId, statut, includes } = req.query;
         const filters = {};
@@ -58,14 +56,14 @@ async getAllDossiers(req, res) {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-},
+};
 
 /**
-   * Récupère un dossier médical par son ID.
-   * @param {object} req - L'objet de requête Express.
-   * @param {object} res - L'objet de réponse Express.
-   */
-async getDossierById(req, res) {
+ * Récupère un dossier médical par son ID.
+ * @param {object} req - L'objet de requête Express.
+ * @param {object} res - L'objet de réponse Express.
+ */
+exports.getDossierById = async (req, res) => {
     try {
         const { id } = req.params;
         const { includes } = req.query;
@@ -79,14 +77,14 @@ async getDossierById(req, res) {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-},
+};
 
 /**
-   * Met à jour un dossier médical.
-   * @param {object} req - L'objet de requête Express.
-   * @param {object} res - L'objet de réponse Express.
-   */
-async updateDossier(req, res) {
+ * Met à jour un dossier médical.
+ * @param {object} req - L'objet de requête Express.
+ * @param {object} res - L'objet de réponse Express.
+ */
+exports.updateDossier = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -103,14 +101,14 @@ async updateDossier(req, res) {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-},
+};
 
 /**
-   * Supprime logiquement un dossier médical.
-   * @param {object} req - L'objet de requête Express.
-   * @param {object} res - L'objet de réponse Express.
-   */
-async deleteDossier(req, res) {
+ * Supprime logiquement un dossier médical.
+ * @param {object} req - L'objet de requête Express.
+ * @param {object} res - L'objet de réponse Express.
+ */
+exports.deleteDossier = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await dossierMedicalService.deleteDossier(id);
@@ -121,8 +119,54 @@ async deleteDossier(req, res) {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-},
-
 };
 
-module.exports = dossierMedicalController;
+/**
+ * Récupère le dossier médical complet d'un patient avec toutes les informations nécessaires au partage
+ * @param {object} req - L'objet de requête Express.
+ * @param {object} res - L'objet de réponse Express.
+ */
+exports.getDossierCompletPatient = async (req, res) => {
+    try {
+        const { patient_id } = req.params;
+        
+        // Vérification des autorisations
+        if (req.user.role === 'patient' && req.user.id_patient !== parseInt(patient_id)) {
+            return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à accéder à ce dossier.' });
+        }
+
+        const dossierComplet = await dossierMedicalService.getDossierCompletPatient(patient_id);
+        
+        res.status(200).json({
+            status: 'success',
+            data: dossierComplet
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+/**
+ * Récupère un résumé des informations médicales d'un patient
+ * @param {object} req - L'objet de requête Express.
+ * @param {object} res - L'objet de réponse Express.
+ */
+exports.getResumePatient = async (req, res) => {
+    try {
+        const { patient_id } = req.params;
+        
+        // Vérification des autorisations
+        if (req.user.role === 'patient' && req.user.id_patient !== parseInt(patient_id)) {
+            return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à accéder à ce résumé.' });
+        }
+
+        const resume = await dossierMedicalService.getResumePatient(patient_id);
+        
+        res.status(200).json({
+            status: 'success',
+            data: resume
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};

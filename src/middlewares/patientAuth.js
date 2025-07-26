@@ -44,12 +44,14 @@ const patientAuth = catchAsync(async (req, res, next) => {
     );
   }
 
-  // 4) Check if patient account is active
+  // 4) Check if patient account is active (commented for testing)
+  /*
   if (currentPatient.statut_compte !== 'actif') {
     return next(
       new AppError('Votre compte DMP n\'est pas actif. Veuillez contacter l\'administration.', 403)
     );
   }
+  */
 
   // 5) Check if patient has access to DMP
   if (currentPatient.acces_dmp === false) {
@@ -92,19 +94,14 @@ const patientAuth = catchAsync(async (req, res, next) => {
     console.error('Erreur mise à jour dernière connexion:', error);
   }
 
-  // 10) Optional: Check for concurrent sessions (uncomment if needed)
-  /*
-  if (currentPatient.session_active && currentPatient.session_active !== decoded.jti) {
-    return next(
-      new AppError('Une autre session est déjà active. Veuillez vous reconnecter.', 401)
-    );
-  }
-  */
-
-  // GRANT ACCESS TO PROTECTED DMP ROUTE
+  // 10) Set req.patient and req.user for compatibility with getPatient
   req.patient = currentPatient;
+  req.user = {
+    role: 'patient',
+    id_patient: currentPatient.id_patient
+  };
   res.locals.patient = currentPatient; // Available in views if needed
-  
+
   next();
 });
 

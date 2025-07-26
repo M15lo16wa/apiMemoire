@@ -8,6 +8,8 @@ const consultationRoutes = require('../modules/consultation/consultationRoutes')
 const hopitalRoutes = require('../modules/hopitaux/hopitaux.route');
 const serviceSanteRoutes = require('../modules/serviceSante/serviceSante.route');
 const rendezVousRoutes = require('../modules/rendezVous/rendezVous.route');
+const prescriptionRoutes = require('../modules/prescription/prescription.route');
+const examenLaboRoutes = require('../modules/examenLabo/examenLabo.route');
 
 const router = express.Router();
 
@@ -21,6 +23,8 @@ router.use('/service-sante', serviceSanteRoutes);
 router.use('/dossierMedical', dossierMedicalRoutes);
 router.use('/consultation', consultationRoutes);
 router.use('/rendez-vous', rendezVousRoutes);
+router.use('/prescription', prescriptionRoutes);
+router.use('/examen-labo', examenLaboRoutes);
 // Route de déconnexion directe pour plus de commodité
 
 module.exports = router;

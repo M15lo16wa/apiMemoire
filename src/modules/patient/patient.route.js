@@ -1,6 +1,7 @@
 const express = require('express');
 const patientController = require('./patient.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
+const patientAuth = require('../../middlewares/patientAuth');
 
 const router = express.Router();
 
@@ -255,5 +256,95 @@ router
     authMiddleware.restrictTo('administrateur'), 
     patientController.deletePatient
   ); // Seuls les administrateurs peuvent supprimer
+
+/**
+ * @swagger
+ * /patient/auth/login:
+ *   post:
+ *     summary: Connexion d'un patient avec numéro d'assuré et mot de passe
+ *     tags: [Patient]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - numero_assure
+ *               - mot_de_passe
+ *             properties:
+ *               numero_assure:
+ *                 type: string
+ *                 example: "SN123456789"
+ *               mot_de_passe:
+ *                 type: string
+ *                 example: "motdepasse123"
+ *     responses:
+ *       200:
+ *         description: Connexion réussie
+ *       401:
+ *         description: Numéro d'assuré ou mot de passe incorrect
+ */
+router.post('/auth/login', patientController.login);
+
+/**
+ * @swagger
+ * /patient/auth/logout:
+ *   post:
+ *     summary: Déconnexion d'un patient
+ *     tags: [Patient]
+ *     responses:
+ *       200:
+ *         description: Déconnexion réussie
+ */
+router.post('/auth/logout', patientController.logout);
+
+/**
+ * @swagger
+ * /patient/auth/me:
+ *   get:
+ *     summary: Récupérer le profil du patient connecté
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profil du patient
+ *       401:
+ *         description: Non authentifié
+ */
+router.get('/auth/me', patientAuth, patientController.getMe);
+
+/**
+ * @swagger
+ * /patient/auth/change-password:
+ *   post:
+ *     summary: Changer le mot de passe du patient
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mot_de_passe_actuel
+ *               - nouveau_mot_de_passe
+ *             properties:
+ *               mot_de_passe_actuel:
+ *                 type: string
+ *                 example: "ancienMotDePasse123"
+ *               nouveau_mot_de_passe:
+ *                 type: string
+ *                 example: "nouveauMotDePasse456"
+ *     responses:
+ *       200:
+ *         description: Mot de passe changé avec succès
+ *       401:
+ *         description: Mot de passe actuel incorrect
+ */
+router.post('/auth/change-password', patientAuth, patientController.changePassword);
 
 module.exports = router;

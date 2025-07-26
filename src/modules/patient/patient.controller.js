@@ -1,4 +1,5 @@
 const patientService = require('./patient.service');
+const patientAuthService = require('./patient.auth.service');
 const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/appError');
 
@@ -67,5 +68,64 @@ exports.deletePatient = catchAsync(async (req, res, next) => {
   res.status(204).json({
     status: 'success',
     data: null,
+  });
+});
+
+// Authentication endpoints for patients
+exports.login = catchAsync(async (req, res, next) => {
+  const { numero_assure, mot_de_passe } = req.body;
+
+  if (!numero_assure || !mot_de_passe) {
+    return next(new AppError('Veuillez fournir votre numéro d\'assuré et votre mot de passe', 400));
+  }
+
+  try {
+    const patient = await patientAuthService.loginPatient(numero_assure, mot_de_passe);
+    patientAuthService.sendAuthToken(patient, 200, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+exports.logout = (req, res) => {
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 10 * 1000), // Expire dans 10 secondes pour forcer la déconnexion
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+  });
+  res.status(200).json({ status: 'success', message: 'Déconnexion réussie' });
+};
+
+exports.changePassword = catchAsync(async (req, res, next) => {
+  const patientId = req.patient && req.patient.id_patient;
+  const { mot_de_passe_actuel, nouveau_mot_de_passe } = req.body;
+
+  if (!mot_de_passe_actuel || !nouveau_mot_de_passe) {
+    return next(new AppError('Veuillez fournir votre mot de passe actuel et le nouveau mot de passe.', 400));
+  }
+  
+  try {
+    await patientAuthService.changePatientPassword(patientId, mot_de_passe_actuel, nouveau_mot_de_passe);
+    res.status(200).json({
+      status: 'success',
+      message: 'Mot de passe mis à jour avec succès'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+exports.getMe = catchAsync(async (req, res, next) => {
+  // req.patient est attaché par le middleware patientAuth
+  if (!req.patient) {
+    return next(new AppError('Patient non trouvé dans la requête. Authentification échouée.', 500));
+  }
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      patient: req.patient
+    }
   });
 });

@@ -76,10 +76,6 @@ module.exports = (sequelize) => {
       allowNull: true,
       unique: true,
     },
-    mot_de_passe: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-    },
     profession: {
       type: DataTypes.STRING(100),
       allowNull: true,
@@ -157,16 +153,6 @@ module.exports = (sequelize) => {
     },
     // La relation avec Utilisateur est gérée via createdBy et updatedBy
   }, {
-    hooks: {
-      beforeCreate: async (patient) => {
-        if (!patient.numero_dossier) {
-          // Générer un numéro de dossier unique basé sur la date et un nombre aléatoire
-          const date = new Date();
-          const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 chiffres aléatoires
-          patient.numero_dossier = `PAT-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}-${randomNum}`;
-        }
-      }
-    },
     tableName: 'Patients',
     timestamps: true,
     paranoid: true, // Active la suppression douce (soft delete)
@@ -245,7 +231,10 @@ module.exports = (sequelize) => {
       raw: true
     });
     
-    if (dossiers.length === 0) return [];
+    // if (dossiers.length === 0) return [];
+    if (dossiers.length === 0) {
+      return [];
+    }
     
     const dossierIds = dossiers.map(d => d.id_dossier);
     
@@ -282,7 +271,10 @@ module.exports = (sequelize) => {
       raw: true
     });
     
-    if (dossiers.length === 0) return [];
+    // if (dossiers.length === 0) return [];
+    if (dossiers.length === 0) {
+      return [];
+    }
     
     const dossierIds = dossiers.map(d => d.id_dossier);
     
