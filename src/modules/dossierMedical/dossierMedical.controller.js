@@ -14,6 +14,7 @@ exports.createDossier = async (req, res) => {
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
+    // On ignore tout medecin_referent_id ou professionnel_sante_id passé dans le body pour garantir la cohérence session
     const { patient_id, ...dossierData } = req.body;
 
     try {
@@ -27,6 +28,9 @@ exports.createDossier = async (req, res) => {
         }
         const service_id = professionnel.service_id;
         const medecin_referent_id = professionnel.id_professionnel;
+        if (!medecin_referent_id) {
+            return res.status(403).json({ message: "Impossible de déterminer l'identifiant du professionnel de santé référent." });
+        }
         // Génération automatique du numéro de dossier si absent ou vide
         let numeroDossier = dossierData.numeroDossier;
         if (!numeroDossier || typeof numeroDossier !== 'string' || numeroDossier.trim() === '') {
@@ -35,8 +39,6 @@ exports.createDossier = async (req, res) => {
             const timePart = Date.now().toString(36).toUpperCase();
             numeroDossier = `DOSSIER-${randomPart}-${timePart}`;
         }
-        const createdBy = req.user ? req.user.id_utilisateur || req.user.id : null;
-
         // Correction : statut synchronisé avec la migration (actif, ferme, archive, fusionne)
         let statut = dossierData.statut ? dossierData.statut.toLowerCase() : 'actif';
         // Sécurise la valeur
@@ -44,13 +46,21 @@ exports.createDossier = async (req, res) => {
         if (!statutEnum.includes(statut)) { statut = 'actif'; }
         const dataToCreate = {
             patient_id,
-            medecin_referent_id, // injection automatique dans la bonne colonne
+            medecin_referent_id, // toujours injecté depuis la session
             service_id,
             numeroDossier,
-            createdBy,
             ...dossierData,
             statut
         };
+        // Ajoute createdBy uniquement pour les utilisateurs classiques (jamais undefined pour un professionnel)
+        if (req.user && !req.professionnel && (req.user.id_utilisateur || req.user.id)) {
+            dataToCreate.createdBy = req.user.id_utilisateur || req.user.id;
+        } else {
+            // On retire la clé si elle existe et n'est pas définie
+            if (typeof dataToCreate.createdBy === 'undefined') {
+                delete dataToCreate.createdBy;
+            }
+        }
 
         const nouveauDossier = await dossierMedicalService.createDossier(dataToCreate);
         res.status(201).json({ message: 'Dossier médical créé avec succès.', dossier: nouveauDossier });

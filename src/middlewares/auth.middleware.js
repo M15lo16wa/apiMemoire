@@ -40,21 +40,37 @@ exports.protect = catchAsync(async (req, res, next) => {
     }
   }
 
-  // 4) Vérifier si l'utilisateur existe toujours
-  const currentUser = await Utilisateur.findByPk(decoded.id);
-  if (!currentUser) {
-    return next(new AppError('The user belonging to this token no longer exists.', 401));
+  // 4) Gestion fine selon le contenu du token
+  const { ProfessionnelSante, Utilisateur } = require('../models');
+  const professionnelId = decoded.professionnel_id || decoded.id_professionnel;
+  if (professionnelId && decoded.professionnel_id) {
+    // Cas professionnel de santé (clé compatible)
+    const professionnel = await ProfessionnelSante.findByPk(professionnelId);
+    if (!professionnel) {
+      return next(new AppError('Le professionnel de santé lié à ce token n\'existe plus.', 401));
+    }
+    if (professionnel.statut !== 'actif') {
+      return next(new AppError('Votre compte professionnel n\'est pas actif.', 401));
+    }
+    req.user = professionnel;
+    req.professionnel = professionnel;
+    res.locals.user = professionnel;
+    return next();
+  } else if (decoded.id) {
+    // Cas utilisateur classique
+    const currentUser = await Utilisateur.findByPk(decoded.id);
+    if (!currentUser) {
+      return next(new AppError('The user belonging to this token no longer exists.', 401));
+    }
+    if (currentUser.statut !== 'actif') {
+      return next(new AppError('Your account is not active. Please contact an administrator.', 401));
+    }
+    req.user = currentUser;
+    res.locals.user = currentUser;
+    return next();
+  } else {
+    return next(new AppError('Token invalide ou incomplet.', 401));
   }
-
-  // 5) Vérifier si l'utilisateur est actif
-  if (currentUser.statut !== 'actif') {
-    return next(new AppError('Your account is not active. Please contact an administrator.', 401));
-  }
-
-  // 6) Grant access to protected route
-  req.user = currentUser;
-  res.locals.user = currentUser;
-  next();
 });
 
 // Alias pour authenticateToken (compatibilité avec les modules existants)

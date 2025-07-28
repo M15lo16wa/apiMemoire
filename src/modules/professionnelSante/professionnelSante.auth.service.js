@@ -8,8 +8,13 @@ const jwt = require('jsonwebtoken');
  * @param {number} id - Professional ID
  * @returns {string} JWT token
  */
-const signToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+const signToken = (professional) => {
+  // On encode professionnel_id, utilisateur_id et le vrai role dans le token
+  return jwt.sign({
+    professionnel_id: professional.id_professionnel,
+    utilisateur_id: professional.utilisateur_id,
+    role: professional.role // ex: 'medecin', 'infirmier', ...
+  }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
 };
@@ -21,7 +26,7 @@ const signToken = (id) => {
  * @param {Object} res - Express response object
  */
 const createSendToken = (professional, statusCode, res) => {
-  const token = signToken(professional.id_professionnel);
+  const token = signToken(professional);
 
   const cookieOptions = {
     expires: new Date(
