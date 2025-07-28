@@ -1,10 +1,7 @@
 // src/models/ServiceSante.js
+'use strict';
+const { DataTypes } = require('sequelize');
 
-const { DataTypes, Op } = require('sequelize');
-
-/**
- * Modèle représentant un service de santé dans l'établissement
- */
 module.exports = (sequelize) => {
   const ServiceSante = sequelize.define('ServiceSante', {
     id_service: {
@@ -102,178 +99,34 @@ module.exports = (sequelize) => {
       validate: {
         notEmpty: { msg: 'Le statut est obligatoire' }
       },
-      comment: 'Statut du service pour la gestion du cycle de vie'
+      comment: 'Statut d\'activité du service'
     },
+    // capacite_accueil supprimé pour correspondre à la base
     horaires_ouverture: {
-      type: DataTypes.JSONB,
+      type: DataTypes.STRING(200),
       allowNull: true,
-      defaultValue: {},
-      comment: 'Horaires d\'ouverture du service (format JSON)'
-    },
-    informations_complementaires: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-      defaultValue: {},
-      comment: 'Informations complémentaires structurées'
-    },
-    createdBy: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Utilisateurs',
-        key: 'id_utilisateur',
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL',
-      comment: 'Utilisateur ayant créé l\'enregistrement'
-    },
-    updatedBy: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'Utilisateurs',
-        key: 'id_utilisateur',
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL',
-      comment: 'Dernier utilisateur ayant modifié l\'enregistrement'
+      comment: 'Horaires d\'ouverture du service (format libre)'
     },
   }, {
     tableName: 'ServicesSante',
     timestamps: true,
-    paranoid: true, // Active la suppression douce (soft delete)
-    defaultScope: {
-      where: { statut: 'ACTIF' },
-      attributes: {
-        exclude: ['createdAt', 'updatedAt', 'deletedAt']
+    paranoid: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['code']
       },
-    },
-    scopes: {
-      // Inclure les services inactifs
-      avecInactifs: {
-        where: {}
+      {
+        fields: ['type_service']
       },
-      // Filtrer par hôpital
-      parHopital: (hopitalId) => ({
-        where: { hopital_id: hopitalId }
-      }),
-      // Filtrer par type de service
-      parType: (type) => ({
-        where: { type_service: type }
-      }),
-      // Charger les dossiers médicaux du service
-      avecDossiers: {
-        include: [
-          {
-            model: sequelize.models.DossierMedical,
-            as: 'dossiers',
-            include: [
-              { model: sequelize.models.Patient, attributes: ['id_patient', 'nom', 'prenom', 'date_naissance'] },
-              { model: sequelize.models.ProfessionnelSante, as: 'medecinReferent', attributes: ['id_professionnel'] }
-            ]
-          }
-        ]
+      {
+        fields: ['hopital_id']
+      },
+      {
+        fields: ['statut']
       }
-    },
-    hooks: {
-      // Nettoyage du code avant validation
-      beforeValidate: (service) => {
-        if (service.code) {
-          service.code = service.code.toUpperCase().replace(/\s+/g, '_');
-        }
-      },
-      // Vérification de l'unicité du code dans l'hôpital
-      beforeCreate: async (service) => {
-        if (service.code && service.hopital_id) {
-          const existingService = await sequelize.models.ServiceSante.findOne({
-            where: {
-              code: service.code,
-              hopital_id: service.hopital_id,
-              id_service: { [Op.ne]: service.id_service || null }
-            },
-            paranoid: false // Inclure les services supprimés logiquement dans la vérification d'unicité
-          });
-
-          if (existingService) {
-            throw new Error('Un service avec ce code existe déjà dans cet hôpital');
-          }
-        }
-      },
-      beforeUpdate: async (service) => {
-        if (service.code && service.hopital_id) {
-          const existingService = await sequelize.models.ServiceSante.findOne({
-            where: {
-              code: service.code,
-              hopital_id: service.hopital_id,
-              id_service: { [Op.ne]: service.id_service }
-            },
-            paranoid: false
-          });
-
-          if (existingService) {
-            throw new Error('Un service avec ce code existe déjà dans cet hôpital');
-          }
-        }
-      }
-    }
+    ]
   });
-
-  /**
-   * Récupère tous les dossiers médicaux gérés par ce service
-   * @param {Object} options - Options de requête Sequelize supplémentaires
-   * @returns {Promise<Array>} Liste des dossiers médicaux
-   */
-  ServiceSante.prototype.getDossiersMedicaux = async function(options = {}) {
-    return await this.getDossiersServices({
-      include: [
-        {
-          model: sequelize.models.Patient,
-          attributes: ['id_patient', 'nom', 'prenom', 'date_naissance', 'sexe']
-        },
-        {
-          model: sequelize.models.ProfessionnelSante,
-          as: 'medecinReferent',
-          attributes: ['id_professionnel'],
-          include: [
-            {
-              model: sequelize.models.Utilisateur,
-              attributes: ['nom', 'prenom']
-            }
-          ]
-        },
-        {
-          model: sequelize.models.Consultation,
-          attributes: ['id_consultation', 'date_consultation', 'motif'],
-          order: [['date_consultation', 'DESC']],
-          limit: 1,
-          separate: true
-        }
-      ],
-      order: [['date_creation', 'DESC']],
-      ...options
-    });
-  };
-
-  /**
-   * Récupère tous les professionnels de santé affectés à ce service
-   * @param {Object} options - Options de requête Sequelize supplémentaires
-   * @returns {Promise<Array>} Liste des professionnels du service
-   */
-  ServiceSante.prototype.getProfessionnels = async function(options = {}) {
-    return await this.getProfessionnelsDuService({
-      include: [
-          {
-            model: sequelize.models.Utilisateur,
-            attributes: ['nom', 'prenom', 'email', 'telephone']
-          }
-        ],
-        order: [
-          [{ model: sequelize.models.Utilisateur }, 'nom', 'ASC'],
-          [{ model: sequelize.models.Utilisateur }, 'prenom', 'ASC']
-        ],
-      ...options
-    });
-  };
 
   return ServiceSante;
 };

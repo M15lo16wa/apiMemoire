@@ -700,7 +700,22 @@ seed();
 
 **Mot de passe utilisé pour tous les comptes générés automatiquement :**
 ```
-Test@1234
+const { ProfessionnelSante } = require('../models');
+
+module.exports = async (req, res, next) => {
+  try {
+    // L'utilisateur connecté est dans req.user (décodé par le middleware protect)
+    const utilisateurId = req.user.id;
+    const professionnel = await ProfessionnelSante.findOne({ where: { utilisateur_id: utilisateurId } });
+    if (!professionnel) {
+      return res.status(403).json({ message: "Aucun professionnel de santé associé à cet utilisateur." });
+    }
+    req.professionnel = professionnel; // Ajoute le professionnel à la requête
+    next();
+  } catch (err) {
+    next(err);
+  }
+};Test@1234
 ```
 
 ---

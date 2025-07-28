@@ -8,8 +8,8 @@ module.exports = (sequelize) => {
       autoIncrement: true,
       allowNull: false,
     },
-    datePrescription: {
-      type: DataTypes.DATEONLY,
+    date_prescription: {
+      type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
@@ -32,10 +32,6 @@ module.exports = (sequelize) => {
     instructions: {
       type: DataTypes.TEXT,
       allowNull: true,
-    },
-    prescrit_traitement: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
     },
   }, {
     tableName: 'Prescriptions',

@@ -110,7 +110,7 @@ const prescriptionService = {
                     ...filters
                 },
                 include: includeOptions,
-                order: [['datePrescription', 'DESC']]
+                order: [['date_prescription', 'DESC']]
             });
 
             return prescriptions;
@@ -265,7 +265,7 @@ const prescriptionService = {
                         include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
                     }
                 ],
-                order: [['datePrescription', 'DESC']]
+                order: [['date_prescription', 'DESC']]
             });
 
             return prescriptions;

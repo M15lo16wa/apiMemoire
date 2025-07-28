@@ -42,9 +42,9 @@ exports.getProfessionnelById = async (id) => {
 
 exports.createProfessionnel = async (professionnelData) => {
   // Vérifier si un professionnel avec le même numero_licence existe déjà
-  if (professionnelData.numero_licence) {
+  if (professionnelData.numero_adeli) {
       const existingProf = await ProfessionnelSante.findOne({
-        where: { numero_licence: professionnelData.numero_licence }
+        where: { numero_adeli: professionnelData.numero_adeli }
       });
       if (existingProf) {
         throw new AppError('A professional with this license number already exists.', 400);

@@ -1,5 +1,3 @@
-// src/models/DossierMedical.js
-
 const { DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
@@ -24,8 +22,8 @@ module.exports = (sequelize) => {
       comment: 'Date de création du dossier médical'
     },
     statut: {
-      type: DataTypes.ENUM('Ouvert', 'Fermé', 'Archivé'), // Correction des valeurs pour correspondre à votre migration si besoin, ou standardisez. Migration: 'actif', 'ferme', 'archive', 'fusionne'
-      defaultValue: 'Ouvert', // Ajustez si vous préférez 'actif' comme défaut
+      type: DataTypes.ENUM('actif', 'ferme', 'archive', 'fusionne'),
+      defaultValue: 'actif',
       allowNull: false,
       comment: 'Statut actuel du dossier médical'
     },

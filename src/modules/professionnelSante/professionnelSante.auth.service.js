@@ -45,18 +45,22 @@ const createSendToken = (professional, statusCode, res) => {
 
 /**
  * Login professional with numero_adeli (numero_licence) and password
- * @param {string} numero_adeli - Professional ADELI number (stored as numero_licence)
+ * @param {string} numero_adeli - Professional ADELI number (stored as numero_adeli)
  * @param {string} mot_de_passe - Professional password
  * @returns {Object} Professional object
  */
 exports.loginProfessionnel = async (numero_adeli, mot_de_passe) => {
+  console.log('DEBUG LOGIN - numero_adeli reçu:', numero_adeli);
+  console.log('DEBUG LOGIN - mot_de_passe reçu:', mot_de_passe);
+
   if (!numero_adeli || !mot_de_passe) {
     throw new AppError('Veuillez fournir votre numéro ADELI et votre mot de passe', 400);
   }
 
-  // Find professional by numero_licence (as numero_adeli)
+  // Find professional by numero_adeli (as numero_adeli)
   const professionnel = await ProfessionnelSante.findOne({
-    where: { numero_licence: numero_adeli },
+    where: { numero_adeli: numero_adeli },
+    attributes: { include: ['mot_de_passe'] }, // Inclure explicitement le mot de passe
     include: {
       model: Utilisateur,
       as: 'compteUtilisateur',
@@ -65,32 +69,44 @@ exports.loginProfessionnel = async (numero_adeli, mot_de_passe) => {
   });
 
   if (!professionnel) {
+    console.log('DEBUG LOGIN - Aucun professionnel trouvé pour ce numero_adeli');
     throw new AppError('Numéro ADELI ou mot de passe incorrect', 401);
   }
 
-  // Check if professional has an associated user account
-  if (!professionnel.compteUtilisateur) {
-    throw new AppError('Compte utilisateur non trouvé pour ce professionnel', 401);
+  console.log('DEBUG LOGIN - mot_de_passe stocké (hashé):', professionnel.mot_de_passe);
+  console.log('DEBUG LOGIN - utilisateur_id:', professionnel.utilisateur_id);
+  console.log('DEBUG LOGIN - statut:', professionnel.statut);
+
+  // Si le professionnel a un compte utilisateur associé, on vérifie sur ce compte
+  if (professionnel.compteUtilisateur) {
+    const isPasswordCorrect = await bcrypt.compare(mot_de_passe, professionnel.compteUtilisateur.mot_de_passe);
+    if (!isPasswordCorrect) {
+      console.log('DEBUG LOGIN - Mot de passe incorrect pour compte utilisateur associé');
+      throw new AppError('Numéro ADELI ou mot de passe incorrect', 401);
+    }
+    if (professionnel.compteUtilisateur.statut !== 'actif') {
+      throw new AppError('Votre compte est inactif. Veuillez contacter l\'administrateur.', 401);
+    }
+    await professionnel.compteUtilisateur.update({ date_derniere_connexion: new Date() });
+    professionnel.compteUtilisateur.mot_de_passe = undefined;
+    return professionnel;
   }
 
-  // Check if password is correct
-  const isPasswordCorrect = await bcrypt.compare(mot_de_passe, professionnel.compteUtilisateur.mot_de_passe);
-  
+  // Sinon, on vérifie le mot de passe sur le professionnel lui-même
+  if (!professionnel.mot_de_passe) {
+    console.log('DEBUG LOGIN - Aucun mot de passe défini pour ce professionnel');
+    throw new AppError('Aucun mot de passe défini pour ce professionnel', 401);
+  }
+  const isPasswordCorrect = await bcrypt.compare(mot_de_passe, professionnel.mot_de_passe);
   if (!isPasswordCorrect) {
+    console.log('DEBUG LOGIN - Mot de passe incorrect pour professionnel');
     throw new AppError('Numéro ADELI ou mot de passe incorrect', 401);
   }
-
-  // Check if user account is active
-  if (professionnel.compteUtilisateur.statut !== 'actif') {
-    throw new AppError('Votre compte est inactif. Veuillez contacter l\'administrateur.', 401);
+  // On peut aussi vérifier le statut si besoin (ex: professionnel.statut)
+  if (professionnel.statut && professionnel.statut !== 'actif') {
+    throw new AppError('Votre compte professionnel est inactif. Veuillez contacter l\'administrateur.', 401);
   }
-
-  // Update last login date
-  await professionnel.compteUtilisateur.update({ date_derniere_connexion: new Date() });
-
-  // Remove sensitive data
-  professionnel.compteUtilisateur.mot_de_passe = undefined;
-
+  // On peut mettre à jour une date de connexion si besoin
   return professionnel;
 };
 

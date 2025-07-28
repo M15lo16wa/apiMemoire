@@ -15,13 +15,39 @@ POST http://localhost:3000/api/professionnelSante
 Content-Type: application/json
 
 {
-  "nom": "Dupont",
-  "prenom": "Jean",
-  "email": "jean.dupont@hopital.fr",
-  "numero_adeli": "123456789",
-  "mot_de_passe": "motdepasse123",
+  "nom": "Martin",
+  "prenom": "Sophie",
+  "date_naissance": "1980-03-15",
+  "sexe": "F",
+  "specialite": "Cardiologie",
+  "email": "sophie.martin@hopital.fr",
+  "telephone": "+33123456789",
+  "telephone_portable": "+33612345678",
+  "adresse": "456 Avenue des Médecins",
+  "code_postal": "75002",
+  "ville": "Paris",
+  "pays": "France",
   "role": "medecin",
-  "specialite": "Cardiologie"
+  "numero_licence": "123456789",
+  "numero_adeli": "987654321",
+  "mot_de_passe": "motdepasse123",
+  "date_obtention_licence": "2005-06-20",
+  "statut": "actif",
+  "date_embauche": "2010-09-01",
+  "description": "Spécialiste en cardiologie avec 15 ans d'expérience",
+  "photo_url": "https://example.com/photo.jpg"
+}
+```
+
+### Connexion d'un professionnel de santé
+```bash
+# Se connecter avec numero_adeli et mot_de_passe
+POST http://localhost:3000/api/professionnelSante/login
+Content-Type: application/json
+
+{
+  "numero_adeli": "987654321",
+  "mot_de_passe": "motdepasse123"
 }
 ```
 
@@ -173,4 +199,31 @@ Authorization: Bearer <JWT_TOKEN>
 3. ✅ Colonne `mot_de_passe` ajoutée à la table `ProfessionnelsSante`
 4. ✅ Tous les endpoints sont protégés par authentification
 5. ✅ Validation des données fonctionnelle
-6. ✅ Gestion des erreurs appropriée 
+6. ✅ Gestion des erreurs appropriée
+
+## 📋 Champs requis pour créer un professionnel de santé
+
+### Champs obligatoires :
+- `nom` : Nom de famille (2-50 caractères)
+- `prenom` : Prénom (2-50 caractères)
+- `date_naissance` : Date de naissance (format YYYY-MM-DD)
+- `sexe` : Sexe (M, F, Autre, Non précisé)
+- `role` : Rôle professionnel (medecin, infirmier, secretaire, etc.)
+
+### Champs optionnels :
+- `specialite` : Spécialité médicale
+- `email` : Adresse email (unique)
+- `telephone` : Numéro de téléphone fixe
+- `telephone_portable` : Numéro de téléphone portable
+- `adresse` : Adresse postale
+- `code_postal` : Code postal (5 chiffres)
+- `ville` : Ville
+- `pays` : Pays (défaut: France)
+- `numero_licence` : Numéro de licence professionnelle
+- `numero_adeli` : Numéro ADELI pour l'authentification
+- `mot_de_passe` : Mot de passe hashé
+- `date_obtention_licence` : Date d'obtention de la licence
+- `statut` : Statut professionnel (actif, inactif, en_conges, retraite)
+- `date_embauche` : Date d'embauche
+- `description` : Description du professionnel
+- `photo_url` : URL de la photo professionnelle 

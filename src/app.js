@@ -1,4 +1,4 @@
-const express = require("express");
+const express = require('express');
 const cors = require("cors");
 const morgan = require('morgan');
 const globalErrorHandler = require('./middlewares/error.middleware');
@@ -134,6 +134,7 @@ const swaggerDefinition = {
       },
       ProfessionnelSante: {
         type: 'object',
+        required: ['nom', 'prenom', 'date_naissance', 'sexe', 'role'],
         properties: {
           id_professionnel: {
             type: 'integer',
@@ -141,61 +142,118 @@ const swaggerDefinition = {
           },
           nom: {
             type: 'string',
-            description: 'Nom de famille du professionnel'
+            minLength: 2,
+            maxLength: 50,
+            description: 'Nom de famille du professionnel (obligatoire)'
           },
           prenom: {
             type: 'string',
-            description: 'Prénom du professionnel'
+            minLength: 2,
+            maxLength: 50,
+            description: 'Prénom du professionnel (obligatoire)'
           },
           date_naissance: {
             type: 'string',
             format: 'date',
-            description: 'Date de naissance du professionnel'
+            description: 'Date de naissance du professionnel (obligatoire)'
           },
           sexe: {
             type: 'string',
             enum: ['M', 'F', 'Autre', 'Non précisé'],
-            description: 'Sexe du professionnel'
+            description: 'Sexe du professionnel (obligatoire)'
           },
           specialite: {
             type: 'string',
+            maxLength: 100,
             description: 'Spécialité du professionnel'
           },
           email: {
             type: 'string',
             format: 'email',
-            description: 'Adresse email du professionnel'
+            maxLength: 100,
+            description: 'Adresse email du professionnel (unique)'
           },
           telephone: {
             type: 'string',
-            description: 'Numéro de téléphone du professionnel'
+            maxLength: 20,
+            description: 'Numéro de téléphone fixe du professionnel'
+          },
+          telephone_portable: {
+            type: 'string',
+            maxLength: 20,
+            description: 'Numéro de téléphone portable du professionnel'
+          },
+          adresse: {
+            type: 'string',
+            maxLength: 255,
+            description: 'Adresse postale du professionnel'
+          },
+          code_postal: {
+            type: 'string',
+            pattern: '^[0-9]{5}$',
+            description: 'Code postal (5 chiffres)'
+          },
+          ville: {
+            type: 'string',
+            maxLength: 100,
+            description: 'Ville de résidence'
+          },
+          pays: {
+            type: 'string',
+            maxLength: 100,
+            default: 'France',
+            description: 'Pays de résidence'
           },
           role: {
             type: 'string',
             enum: ['medecin', 'infirmier', 'secretaire', 'aide_soignant', 'technicien_laboratoire', 'pharmacien', 'kinesitherapeute', 'chirurgien', 'radiologue', 'anesthesiste', 'autre'],
-            description: 'Rôle professionnel'
+            description: 'Rôle professionnel (obligatoire)'
           },
           numero_licence: {
             type: 'string',
+            maxLength: 50,
             description: 'Numéro de licence professionnelle'
           },
           numero_adeli: {
             type: 'string',
+            maxLength: 50,
             description: 'Numéro ADELI pour l\'authentification'
           },
           mot_de_passe: {
             type: 'string',
+            maxLength: 255,
             description: 'Mot de passe hashé (non visible dans les réponses)'
+          },
+          date_obtention_licence: {
+            type: 'string',
+            format: 'date',
+            description: 'Date d\'obtention de la licence'
           },
           statut: {
             type: 'string',
             enum: ['actif', 'inactif', 'en_conges', 'retraite'],
+            default: 'actif',
             description: 'Statut professionnel'
           },
           date_embauche: {
             type: 'string',
             format: 'date',
             description: 'Date d\'embauche'
+          },
+          date_depart: {
+            type: 'string',
+            format: 'date',
+            description: 'Date de départ'
+          },
+          description: {
+            type: 'string',
+            description: 'Description du professionnel'
+          },
+          photo_url: {
+            type: 'string',
+            maxLength: 500,
+            format: 'uri',
+            description: 'URL de la photo professionnelle'
           },
           createdAt: {
             type: 'string',
@@ -613,6 +671,59 @@ const swaggerDefinition = {
           createdAt: { type: 'string', format: 'date-time', description: 'Date de création' },
           updatedAt: { type: 'string', format: 'date-time', description: 'Date de dernière mise à jour' }
         }
+      },
+      Consultation: {
+        type: 'object',
+        properties: {
+          id_consultation: {
+            type: 'integer',
+            description: 'Identifiant unique de la consultation'
+          },
+          dossier_id: {
+            type: 'integer',
+            description: 'ID du dossier médical'
+          },
+          professionnel_id: {
+            type: 'integer',
+            description: 'ID du professionnel de santé'
+          },
+          date_consultation: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date et heure de la consultation'
+          },
+          motif_consultation: {
+            type: 'string',
+            description: 'Motif de la consultation'
+          },
+          diagnostic: {
+            type: 'string',
+            description: 'Diagnostic établi'
+          },
+          traitement_prescrit: {
+            type: 'string',
+            description: 'Traitement prescrit'
+          },
+          observations: {
+            type: 'string',
+            description: 'Observations et notes'
+          },
+          statut: {
+            type: 'string',
+            enum: ['planifiee', 'en_cours', 'terminee', 'annulee'],
+            description: 'Statut de la consultation'
+          },
+          createdAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de création'
+          },
+          updatedAt: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Date de dernière mise à jour'
+          }
+        }
       }
     }
   },
@@ -621,7 +732,7 @@ const swaggerDefinition = {
 const options = {
   swaggerDefinition,
   // Chemins vers les fichiers contenant les annotations OpenAPI
-  apis: ['./src/routes/*.js', './src/modules/**/*.js'],
+  apis: ['./src/routes/*.js', './src/modules/**/*.js', './src/app.js'],
 };
 
 const swaggerSpec = swaggerJSDoc(options);
@@ -634,8 +745,26 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  * tags:
  *   - name: ServiceSante
  *     description: Gestion des services de santé
+ *   - name: ProfessionnelSante
+ *     description: Gestion des professionnels de santé
+ *   - name: ExamenLabo
+ *     description: Gestion des examens de laboratoire
+ *   - name: Consultations
+ *     description: Gestion des consultations médicales
+ *   - name: DossierMedical
+ *     description: Gestion des dossiers médicaux et partage patient-médecin
+ *   - name: Prescription
+ *     description: Gestion des prescriptions et ordonnances
+ *   - name: RendezVous
+ *     description: Gestion des rendez-vous médicaux
+ *   - name: Hopitaux
+ *     description: Gestion des établissements hospitaliers
+ *   - name: Patient
+ *     description: Gestion des patients
+ *   - name: Auth
+ *     description: Authentification et autorisation
  *
- * /api/service-sante:
+ * /service-sante:
  *   post:
  *     summary: Créer un service de santé
  *     tags: [ServiceSante]
@@ -671,7 +800,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  *               items:
  *                 $ref: '#/components/schemas/ServiceSante'
  *
- * /api/service-sante/{id}:
+ * /service-sante/{id}:
  *   get:
  *     summary: Détail d'un service de santé
  *     tags: [ServiceSante]

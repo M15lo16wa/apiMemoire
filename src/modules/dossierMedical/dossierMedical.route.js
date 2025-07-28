@@ -7,13 +7,424 @@ const dossierMedicalController = require('./dossierMedical.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
 const { authenticateToken } = require('../../middlewares/auth.middleware');
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     DossierMedical:
+ *       type: object
+ *       properties:
+ *         id_dossier:
+ *           type: integer
+ *           description: Identifiant unique du dossier médical
+ *         dateCreation:
+ *           type: string
+ *           format: date
+ *           description: Date de création du dossier médical
+ *         statut:
+ *           type: string
+ *           enum: [actif, ferme, archive, fusionne]
+ *           description: Statut actuel du dossier médical
+ *         type_dossier:
+ *           type: string
+ *           enum: [principal, specialite, urgence, suivi, consultation, autre]
+ *           description: Type de dossier médical
+ *         patient_id:
+ *           type: integer
+ *           description: ID du patient propriétaire du dossier
+ *         service_id:
+ *           type: integer
+ *           description: ID du service de santé responsable
+ *         medecin_referent_id:
+ *           type: integer
+ *           description: ID du médecin référent principal
+ *         resume:
+ *           type: string
+ *           description: Résumé clinique du patient
+ *         antecedent_medicaux:
+ *           type: object
+ *           description: Antécédents médicaux structurés
+ *         allergies:
+ *           type: object
+ *           description: Allergies et intolérances
+ *         traitements_chroniques:
+ *           type: object
+ *           description: Traitements au long cours
+ *         parametres_vitaux:
+ *           type: object
+ *           description: Derniers paramètres vitaux
+ *         habitudes_vie:
+ *           type: object
+ *           description: Informations sur le mode de vie
+ *         historique_familial:
+ *           type: string
+ *           description: Antécédents familiaux notables
+ *         directives_anticipées:
+ *           type: string
+ *           description: Directives anticipées et personnes de confiance
+ *         observations:
+ *           type: string
+ *           description: Notes et observations diverses
+ *         createdBy:
+ *           type: integer
+ *           description: ID de l'utilisateur ayant créé le dossier
+ *         updatedBy:
+ *           type: integer
+ *           description: ID du dernier utilisateur ayant modifié le dossier
+ *         date_fermeture:
+ *           type: string
+ *           format: date-time
+ *           description: Date de fermeture du dossier
+ *         motif_fermeture:
+ *           type: string
+ *           description: Raison de la fermeture du dossier
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *           description: Date de création
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ *           description: Date de dernière mise à jour
+ *       required:
+ *         - patient_id
+ *
+ * /dossierMedical:
+ *   post:
+ *     summary: Créer un nouveau dossier médical
+ *     tags: [DossierMedical]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - patient_id
+ *             properties:
+ *               patient_id:
+ *                 type: integer
+ *                 description: ID du patient (obligatoire)
+ *               professionnel_sante_id:
+ *                 type: integer
+ *                 description: ID du professionnel de santé référent
+ *               service_id:
+ *                 type: integer
+ *                 description: ID du service de santé responsable
+ *               statut:
+ *                 type: string
+ *                 enum: [actif, ferme, archive, fusionne]
+ *                 description: Statut du dossier
+ *               dateOuverture:
+ *                 type: string
+ *                 format: date
+ *                 description: Date d'ouverture du dossier
+ *               dateFermeture:
+ *                 type: string
+ *                 format: date
+ *                 description: Date de fermeture du dossier
+ *     responses:
+ *       201:
+ *         description: Dossier médical créé avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 dossier:
+ *                   $ref: '#/components/schemas/DossierMedical'
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non autorisé
+ *       500:
+ *         description: Erreur serveur
+ *   get:
+ *     summary: Récupérer tous les dossiers médicaux
+ *     tags: [DossierMedical]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: patientId
+ *         schema:
+ *           type: integer
+ *         description: Filtrer par ID du patient
+ *       - in: query
+ *         name: statut
+ *         schema:
+ *           type: string
+ *           enum: [actif, ferme, archive, fusionne]
+ *         description: Filtrer par statut
+ *       - in: query
+ *         name: includes
+ *         schema:
+ *           type: string
+ *         description: Modèles à inclure (patient,medecinReferent,serviceResponsable,createur,dernierModificateur)
+ *     responses:
+ *       200:
+ *         description: Liste des dossiers médicaux récupérée avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/DossierMedical'
+ *       401:
+ *         description: Non autorisé
+ *       500:
+ *         description: Erreur serveur
+ *
+ * /dossierMedical/{id}:
+ *   get:
+ *     summary: Récupérer un dossier médical par ID
+ *     tags: [DossierMedical]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du dossier médical
+ *       - in: query
+ *         name: includes
+ *         schema:
+ *           type: string
+ *         description: Modèles à inclure (patient,medecinReferent,serviceResponsable,createur,dernierModificateur)
+ *     responses:
+ *       200:
+ *         description: Dossier médical récupéré avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/DossierMedical'
+ *       404:
+ *         description: Dossier médical non trouvé
+ *       401:
+ *         description: Non autorisé
+ *       500:
+ *         description: Erreur serveur
+ *   put:
+ *     summary: Mettre à jour un dossier médical
+ *     tags: [DossierMedical]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du dossier médical
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               professionnel_sante_id:
+ *                 type: integer
+ *                 description: ID du professionnel de santé référent
+ *               service_id:
+ *                 type: integer
+ *                 description: ID du service de santé responsable
+ *               statut:
+ *                 type: string
+ *                 enum: [actif, ferme, archive, fusionne]
+ *                 description: Statut du dossier
+ *               dateOuverture:
+ *                 type: string
+ *                 format: date
+ *                 description: Date d'ouverture du dossier
+ *               dateFermeture:
+ *                 type: string
+ *                 format: date
+ *                 description: Date de fermeture du dossier
+ *     responses:
+ *       200:
+ *         description: Dossier médical mis à jour avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 dossier:
+ *                   $ref: '#/components/schemas/DossierMedical'
+ *       400:
+ *         description: Données invalides
+ *       404:
+ *         description: Dossier médical non trouvé
+ *       401:
+ *         description: Non autorisé
+ *       500:
+ *         description: Erreur serveur
+ *   delete:
+ *     summary: Supprimer un dossier médical
+ *     tags: [DossierMedical]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du dossier médical
+ *     responses:
+ *       200:
+ *         description: Dossier médical supprimé avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       404:
+ *         description: Dossier médical non trouvé
+ *       401:
+ *         description: Non autorisé
+ *       500:
+ *         description: Erreur serveur
+ *
+ * /dossierMedical/patient/{patient_id}/complet:
+ *   get:
+ *     summary: Récupérer le dossier médical complet d'un patient
+ *     tags: [DossierMedical]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patient_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du patient
+ *     responses:
+ *       200:
+ *         description: Dossier médical complet récupéré avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     dossier:
+ *                       $ref: '#/components/schemas/DossierMedical'
+ *                     prescriptions_actives:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Prescription'
+ *                     examens_recents:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/ExamenLabo'
+ *                     consultations_recentes:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Consultation'
+ *                     demandes_en_attente:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Prescription'
+ *                     resultats_anormaux:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/ExamenLabo'
+ *                     resume:
+ *                       type: object
+ *                       properties:
+ *                         nombre_prescriptions_actives:
+ *                           type: integer
+ *                         nombre_examens_recents:
+ *                           type: integer
+ *                         nombre_consultations_recentes:
+ *                           type: integer
+ *                         nombre_demandes_en_attente:
+ *                           type: integer
+ *                         nombre_resultats_anormaux:
+ *                           type: integer
+ *       403:
+ *         description: Accès non autorisé
+ *       404:
+ *         description: Dossier médical non trouvé
+ *       401:
+ *         description: Non autorisé
+ *       500:
+ *         description: Erreur serveur
+ *
+ * /dossierMedical/patient/{patient_id}/resume:
+ *   get:
+ *     summary: Récupérer le résumé des informations médicales d'un patient
+ *     tags: [DossierMedical]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patient_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du patient
+ *     responses:
+ *       200:
+ *         description: Résumé récupéré avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     resume:
+ *                       type: object
+ *                       properties:
+ *                         prescriptions_actives:
+ *                           type: integer
+ *                         examens_valides:
+ *                           type: integer
+ *                         consultations_total:
+ *                           type: integer
+ *                     dernieres_activites:
+ *                       type: object
+ *                       properties:
+ *                         derniere_prescription:
+ *                           $ref: '#/components/schemas/Prescription'
+ *                         dernier_examen:
+ *                           $ref: '#/components/schemas/ExamenLabo'
+ *                         derniere_consultation:
+ *                           $ref: '#/components/schemas/Consultation'
+ *       403:
+ *         description: Accès non autorisé
+ *       401:
+ *         description: Non autorisé
+ *       500:
+ *         description: Erreur serveur
+ */
+
 // Validation rules pour la création d'un dossier médical
 const createDossierValidationRules = [
     body('patient_id').notEmpty().withMessage('L\'ID du patient est requis').isInt(),
     body('professionnel_sante_id').optional().isInt().withMessage('L\'ID du professionnel de santé doit être un entier'),
     body('service_id').optional().isInt().withMessage('L\'ID du service doit être un entier'),
     body('numeroDossier').optional().isLength({ max: 50 }),
-    body('statut').optional().isIn(['Ouvert', 'Fermé', 'Archivé']),
+    body('statut').optional().isIn(['actif', 'ferme', 'archive', 'fusionne']),
     body('dateOuverture').optional().isISO8601().withMessage('La date d\'ouverture doit être au format ISO'),
     body('dateFermeture').optional().isISO8601().withMessage('La date de fermeture doit être au format ISO')
 ];
@@ -23,14 +434,16 @@ const updateDossierValidationRules = [
     body('professionnel_sante_id').optional().isInt().withMessage('L\'ID du professionnel de santé doit être un entier'),
     body('service_id').optional().isInt().withMessage('L\'ID du service doit être un entier'),
     body('numeroDossier').optional().isLength({ max: 50 }),
-    body('statut').optional().isIn(['Ouvert', 'Fermé', 'Archivé']),
+    body('statut').optional().isIn(['actif', 'ferme', 'archive', 'fusionne']),
     body('dateOuverture').optional().isISO8601().withMessage('La date d\'ouverture doit être au format ISO'),
     body('dateFermeture').optional().isISO8601().withMessage('La date de fermeture doit être au format ISO')
 ];
 
+const attachProfessionnel = require('../../middlewares/attachProfessionnel');
 // Routes CRUD de base
 router.post('/', 
     authenticateToken, 
+    attachProfessionnel, // Ajouté uniquement ici
     createDossierValidationRules, 
     handleValidationErrors, 
     dossierMedicalController.createDossier

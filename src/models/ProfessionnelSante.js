@@ -1,6 +1,7 @@
 // src/models/ProfessionnelSante.js
 
 const { DataTypes, Op } = require('sequelize');
+const bcrypt = require('bcryptjs');
 
 module.exports = (sequelize) => {
   const ProfessionnelSante = sequelize.define('ProfessionnelSante', {
@@ -15,8 +16,7 @@ module.exports = (sequelize) => {
       allowNull: false,
       validate: {
         notEmpty: true,
-        len: [2, 50],
-        is: /^[A-Za-zÀ-ÖØ-öø-ÿ\s\-']+$/
+        len: [2, 50]
       }
     },
     prenom: {
@@ -25,7 +25,7 @@ module.exports = (sequelize) => {
       validate: {
         notEmpty: true,
         len: [2, 50],
-        is: /^[A-Za-zÀ-ÖØ-öø-ÿ\s\-']+$/
+        is: /^[A-Za-zÀ-ÖØ-öø-ÿ\s\-'\.]+$/
       }
     },
     date_naissance: {
@@ -114,10 +114,14 @@ module.exports = (sequelize) => {
       unique: true
     },
     numero_adeli: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.STRING(20),
       allowNull: true,
       unique: true,
-      comment: 'Numéro ADELI pour les professionnels de santé'
+      comment: 'Numéro ADELI pour les professionnels de santé',
+      validate: {
+        is: /^[A-Za-z0-9]{6,20}$/,
+        len: [6, 20]
+      }
     },
     mot_de_passe: {
       type: DataTypes.STRING(255),
@@ -213,6 +217,16 @@ module.exports = (sequelize) => {
         }
         if (professionnel.telephone_portable) {
           professionnel.telephone_portable = professionnel.telephone_portable.replace(/[^0-9+]/g, '');
+        }
+      },
+      async beforeCreate(professionnel) {
+        if (professionnel.mot_de_passe) {
+          professionnel.mot_de_passe = await bcrypt.hash(professionnel.mot_de_passe, 12);
+        }
+      },
+      async beforeUpdate(professionnel) {
+        if (professionnel.changed('mot_de_passe')) {
+          professionnel.mot_de_passe = await bcrypt.hash(professionnel.mot_de_passe, 12);
         }
       }
     }

@@ -13,6 +13,11 @@ const HistoriqueAccess = require('./HistoriqueAccess')(sequelize);
 const AutorisationAcces = require('./AutorisationAcces')(sequelize);
 const ServiceSante = require('./ServiceSante')(sequelize);
 const Hopital = require('./Hopital')(sequelize);
+// 19. ExamenLabo et ProfessionnelSante (prescripteur et validateur)
+ProfessionnelSante.hasMany(ExamenLabo, { foreignKey: 'prescripteur_id', as: 'examensPrescrits', onDelete: 'SET NULL' });
+ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'prescripteur_id', as: 'prescripteur' });
+ProfessionnelSante.hasMany(ExamenLabo, { foreignKey: 'validateur_id', as: 'examensValides', onDelete: 'SET NULL' });
+ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'validateur_id', as: 'validateur' });
 
 
 // --- Définir les associations ---

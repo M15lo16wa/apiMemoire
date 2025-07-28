@@ -8,26 +8,48 @@ const { validationResult } = require('express-validator');
  * @param {object} req - L'objet de requête Express.
  * @param {object} res - L'objet de réponse Express.
  */
+
 exports.createDossier = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
     }
-    const { patient_id, professionnel_sante_id, service_id, createdBy, ...dossierData } = req.body;
+    const { patient_id, ...dossierData } = req.body;
 
     try {
-      // Assurez-vous que patient_id et professionnel_sante_id sont présents et valides
         if (!patient_id) {
-            return res.status(400).json({ message: 'L\'ID du patient est requis.' });
+            return res.status(400).json({ message: "L'ID du patient est requis." });
         }
-      // Note: medecin_referent_id est le nom de la colonne dans le modèle/migration
-      // professionnel_sante_id est l'ID du professionnel de santé passé dans la requête
+        // Injection automatique du professionnel connecté et du service
+        const professionnel = req.professionnel;
+        if (!professionnel) {
+            return res.status(403).json({ message: "Aucun professionnel de santé connecté." });
+        }
+        const service_id = professionnel.service_id;
+        const medecin_referent_id = professionnel.id_professionnel;
+        // Génération automatique du numéro de dossier si absent ou vide
+        let numeroDossier = dossierData.numeroDossier;
+        if (!numeroDossier || typeof numeroDossier !== 'string' || numeroDossier.trim() === '') {
+            // Génère un identifiant alphanumérique unique (ex: DOSSIER-AB12C-1A2B3)
+            const randomPart = Math.random().toString(36).substr(2, 5).toUpperCase();
+            const timePart = Date.now().toString(36).toUpperCase();
+            numeroDossier = `DOSSIER-${randomPart}-${timePart}`;
+        }
+        const createdBy = req.user ? req.user.id_utilisateur || req.user.id : null;
+
+        // Correction : statut synchronisé avec la migration (actif, ferme, archive, fusionne)
+        let statut = dossierData.statut ? dossierData.statut.toLowerCase() : 'actif';
+        // Sécurise la valeur
+        const statutEnum = ['actif', 'ferme', 'archive', 'fusionne'];
+        if (!statutEnum.includes(statut)) { statut = 'actif'; }
         const dataToCreate = {
-        patient_id,
-        medecin_referent_id: professionnel_sante_id, // Mapper vers le nom de la colonne de la DB
-        service_id, // Peut être null si non fourni
-        createdBy, // Peut être null si non fourni (sera l'ID de l'utilisateur connecté)
-        ...dossierData
+            patient_id,
+            medecin_referent_id, // injection automatique dans la bonne colonne
+            service_id,
+            numeroDossier,
+            createdBy,
+            ...dossierData,
+            statut
         };
 
         const nouveauDossier = await dossierMedicalService.createDossier(dataToCreate);

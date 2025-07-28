@@ -1,28 +1,67 @@
 const serviceSanteService = require('./serviceSante.service');
 const catchAsync = require('../../utils/catchAsync');
+const AppError = require('../../utils/appError');
 
-exports.createServiceSante = catchAsync(async (req, res, next) => {
-  const newService = await serviceSanteService.createServiceSante(req.body);
-  res.status(201).json({ status: 'success', data: { service: newService } });
+const createServiceSante = catchAsync(async (req, res) => {
+  const service = await serviceSanteService.createServiceSante(req.body);
+  res.status(201).json({
+    status: 'success',
+    data: {
+      service,
+    },
+  });
 });
 
-exports.getAllServicesSante = catchAsync(async (req, res, next) => {
-  const { hopital_id } = req.query;
-  const services = await serviceSanteService.getAllServicesSante(hopital_id);
-  res.status(200).json({ status: 'success', results: services.length, data: { services } });
+const getAllServicesSante = catchAsync(async (req, res) => {
+  const { hopitalId } = req.query;
+  const services = await serviceSanteService.getAllServicesSante(hopitalId);
+  res.status(200).json({
+    status: 'success',
+    results: services.length,
+    data: {
+      services,
+    },
+  });
 });
 
-exports.getServiceSanteById = catchAsync(async (req, res, next) => {
+const getServiceSanteById = catchAsync(async (req, res, next) => {
   const service = await serviceSanteService.getServiceSanteById(req.params.id);
-  res.status(200).json({ status: 'success', data: { service } });
+  if (!service) {
+    return next(new AppError('No service found with that ID', 404));
+  }
+  res.status(200).json({
+    status: 'success',
+    data: {
+      service,
+    },
+  });
 });
 
-exports.updateServiceSante = catchAsync(async (req, res, next) => {
+const updateServiceSante = catchAsync(async (req, res, next) => {
   const service = await serviceSanteService.updateServiceSante(req.params.id, req.body);
-  res.status(200).json({ status: 'success', data: { service } });
+  if (!service) {
+    return next(new AppError('No service found with that ID', 404));
+  }
+  res.status(200).json({
+    status: 'success',
+    data: {
+      service,
+    },
+  });
 });
 
-exports.deleteServiceSante = catchAsync(async (req, res, next) => {
+const deleteServiceSante = catchAsync(async (req, res, next) => {
   await serviceSanteService.deleteServiceSante(req.params.id);
-  res.status(204).json({ status: 'success', data: null });
+  res.status(204).json({
+    status: 'success',
+    data: null,
+  });
 });
+
+module.exports = {
+  createServiceSante,
+  getAllServicesSante,
+  getServiceSanteById,
+  updateServiceSante,
+  deleteServiceSante,
+};

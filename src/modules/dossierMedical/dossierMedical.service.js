@@ -36,7 +36,13 @@ async getAllDossiers(filters = {}, includes = []) {
         includeOptions.push({ model: ProfessionnelSante, as: 'medecinReferent', include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }] });
     }
     if (includes.includes('serviceResponsable')) {
-        includeOptions.push({ model: ServiceSante, as: 'serviceResponsable' });
+        includeOptions.push({
+            model: ServiceSante,
+            as: 'serviceResponsable',
+            attributes: [
+                'id_service', 'code', 'nom', 'description', 'type_service', 'telephone', 'email', 'hopital_id', 'statut', 'horaires_ouverture', 'informations_complementaires', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt', 'deletedAt'
+            ]
+        });
     }
     if (includes.includes('createur')) {
         includeOptions.push({ model: Utilisateur, as: 'createur', attributes: ['nom', 'prenom'] });
@@ -74,7 +80,13 @@ async getDossierById(id_dossier, includes = []) {
         includeOptions.push({ model: ProfessionnelSante, as: 'medecinReferent', include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }] });
     }
     if (includes.includes('serviceResponsable')) {
-        includeOptions.push({ model: ServiceSante, as: 'serviceResponsable' });
+        includeOptions.push({
+            model: ServiceSante,
+            as: 'serviceResponsable',
+            attributes: [
+                'id_service', 'code', 'nom', 'description', 'type_service', 'telephone', 'email', 'hopital_id', 'statut', 'horaires_ouverture', 'informations_complementaires', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt', 'deletedAt'
+            ]
+        });
     }
     if (includes.includes('createur')) {
         includeOptions.push({ model: Utilisateur, as: 'createur', attributes: ['nom', 'prenom'] });
@@ -166,7 +178,13 @@ async getDossiersByPatientId(patientId, includes = []) {
         includeOptions.push({ model: ProfessionnelSante, as: 'medecinReferent', include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }] });
     }
     if (includes.includes('serviceResponsable')) {
-        includeOptions.push({ model: ServiceSante, as: 'serviceResponsable' });
+        includeOptions.push({
+            model: ServiceSante,
+            as: 'serviceResponsable',
+            attributes: [
+                'id_service', 'code', 'nom', 'description', 'type_service', 'telephone', 'email', 'hopital_id', 'statut', 'horaires_ouverture', 'informations_complementaires', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt', 'deletedAt'
+            ]
+        });
     }
     if (includes.includes('createur')) {
         includeOptions.push({ model: Utilisateur, as: 'createur', attributes: ['nom', 'prenom'] });
@@ -205,7 +223,13 @@ async getDossierCompletPatient(patientId) {
                     as: 'medecinReferent',
                     include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
                 },
-                { model: ServiceSante, as: 'serviceResponsable' }
+                {
+                    model: ServiceSante,
+                    as: 'serviceResponsable',
+                    attributes: [
+                        'id_service', 'code', 'nom', 'description', 'type_service', 'telephone', 'email', 'hopital_id', 'statut', 'horaires_ouverture', 'informations_complementaires', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt', 'deletedAt'
+                    ]
+                }
             ]
         });
 
@@ -226,7 +250,7 @@ async getDossierCompletPatient(patientId) {
                     include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
                 }
             ],
-            order: [['datePrescription', 'DESC']]
+            order: [['date_prescription', 'DESC']]
         });
 
         // Récupérer les résultats d'examen récents
@@ -238,11 +262,16 @@ async getDossierCompletPatient(patientId) {
             include: [
                 { 
                     model: ProfessionnelSante, 
-                    as: 'professionnel',
+                    as: 'prescripteur',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                },
+                {
+                    model: ProfessionnelSante,
+                    as: 'validateur',
                     include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
                 }
             ],
-            order: [['date_examen', 'DESC']],
+            order: [['date_realisation', 'DESC']],
             limit: 10 // Limiter aux 10 derniers examens
         });
 
@@ -264,7 +293,6 @@ async getDossierCompletPatient(patientId) {
         const demandesEnAttente = await Prescription.findAll({
             where: { 
                 patient_id: patientId,
-                prescrit_traitement: false, // Demandes d'examen
                 statut: 'en_attente'
             },
             include: [
@@ -274,24 +302,29 @@ async getDossierCompletPatient(patientId) {
                     include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
                 }
             ],
-            order: [['datePrescription', 'DESC']]
+            order: [['date_prescription', 'DESC']]
         });
 
         // Récupérer les résultats d'examen anormaux récents
         const resultatsAnormaux = await ExamenLabo.findAll({
             where: { 
                 patient_id: patientId,
-                resultat: 'anormal',
+                resultat_texte: 'anormal',
                 statut: 'valide'
             },
             include: [
                 { 
                     model: ProfessionnelSante, 
-                    as: 'professionnel',
+                    as: 'prescripteur',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                },
+                {
+                    model: ProfessionnelSante,
+                    as: 'validateur',
                     include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
                 }
             ],
-            order: [['date_examen', 'DESC']],
+            order: [['date_realisation', 'DESC']],
             limit: 5
         });
 
@@ -338,7 +371,7 @@ async getResumePatient(patientId) {
         // Récupérer les dernières activités
         const dernierePrescription = await Prescription.findOne({
             where: { patient_id: patientId },
-            order: [['datePrescription', 'DESC']],
+            order: [['date_prescription', 'DESC']],
             include: [
                 { 
                     model: ProfessionnelSante, 
@@ -350,7 +383,7 @@ async getResumePatient(patientId) {
 
         const dernierExamen = await ExamenLabo.findOne({
             where: { patient_id: patientId, statut: 'valide' },
-            order: [['date_examen', 'DESC']],
+            order: [['date_realisation', 'DESC']],
             include: [
                 { 
                     model: ProfessionnelSante, 

@@ -3,6 +3,7 @@ const { Consultation, ProfessionnelSante, Patient, DossierMedical, ServiceSante 
 const createConsultation = async (req, res) => {
     try {
     // 1. Récupérer les données envoyées par le frontend
+
     const {
         date_consultation,
         motif,
@@ -14,30 +15,31 @@ const createConsultation = async (req, res) => {
         type_consultation,
         confidentialite,
         dossier_id,
-        professionnel_id,
-        service_id,
         date_annulation,
         motif_annulation,
-      // createdBy et updatedBy seront gérés automatiquement ou via l'utilisateur authentifié
+        // createdBy et updatedBy seront gérés automatiquement ou via l'utilisateur authentifié
     } = req.body;
 
-    // 2. Validation basique (une validation plus avancée peut être faite avec des librairies comme Joi ou Express-validator)
-    if (!dossier_id || !professionnel_id || !motif || !date_consultation) {
-        return res.status(400).json({ message: 'Veuillez fournir tous les champs obligatoires : dossier_id, professionnel_id, motif, date_consultation.' });
+    // Validation basique
+    if (!dossier_id || !motif || !date_consultation) {
+        return res.status(400).json({ message: 'Veuillez fournir tous les champs obligatoires : dossier_id, motif, date_consultation.' });
     }
 
-    // 3. Vérifier l'existence des IDs de référence (très important pour l'intégrité des données)
-    const [dossier, professionnel] = await Promise.all([
-        DossierMedical.findByPk(dossier_id),
-        ProfessionnelSante.findByPk(professionnel_id),
-    ]);
+    // Injection automatique du professionnel connecté et du service
+    const professionnel = req.professionnel;
+    if (!professionnel) {
+        return res.status(403).json({ message: "Aucun professionnel de santé connecté." });
+    }
+    const service_id = professionnel.service_id;
+    const professionnel_id = professionnel.id_professionnel;
 
+    // Vérifier l'existence du dossier
+    const dossier = await DossierMedical.findByPk(dossier_id);
     if (!dossier) {
         return res.status(404).json({ message: 'Dossier médical introuvable.' });
     }
-    if (!professionnel) {
-        return res.status(404).json({ message: 'Professionnel de santé introuvable.' });
-    }
+
+    // Vérifier l'existence du service
     if (service_id) {
         const service = await ServiceSante.findByPk(service_id);
         if (!service) {
@@ -45,11 +47,9 @@ const createConsultation = async (req, res) => {
         }
     }
 
+    const userId = req.user ? req.user.id_utilisateur || req.user.id : null;
 
-    // Supposons que l'ID de l'utilisateur authentifié est disponible dans req.user.id après l'authentification
-    const userId = req.user ? req.user.id : null; // À adapter selon votre système d'authentification
-
-    // 4. Créer la consultation dans la base de données
+    // Créer la consultation
     const newConsultation = await Consultation.create({
         date_consultation,
         motif,
@@ -65,8 +65,8 @@ const createConsultation = async (req, res) => {
         service_id,
         date_annulation,
         motif_annulation,
-      createdBy: userId, // Enregistre l'ID de l'utilisateur qui a créé
-      updatedBy: userId, // Initialise updatedBy aussi
+        createdBy: userId,
+        updatedBy: userId,
     });
 
     // 5. Répondre au client avec la nouvelle consultation créée

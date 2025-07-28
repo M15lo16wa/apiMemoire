@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const consultationController = require('./consultationController');
-// const authMiddleware = require('../../middlewares/auth.middleware'); // Si vous avez un middleware d'authentification
+const attachProfessionnel = require('../../middlewares/attachProfessionnel');
 
 /**
  * @swagger
@@ -76,7 +76,7 @@ const consultationController = require('./consultationController');
 
 /**
  * @swagger
- * /api/consultation:
+ * /consultation:
  *   get:
  *     summary: Récupérer toutes les consultations
  *     tags: [Consultations]
@@ -98,7 +98,7 @@ router.get('/', consultationController.getAllConsultations);
 
 /**
  * @swagger
- * /api/consultation/{id}:
+ * /consultation/{id}:
  *   get:
  *     summary: Récupérer une consultation par ID
  *     tags: [Consultations]
@@ -127,7 +127,7 @@ router.get('/:id', consultationController.getConsultationById);
 
 /**
  * @swagger
- * /api/consultation/dossier/{dossier_id}:
+ * /consultation/dossier/{dossier_id}:
  *   get:
  *     summary: Récupérer les consultations par dossier médical
  *     tags: [Consultations]
@@ -156,7 +156,7 @@ router.get('/dossier/:dossier_id', consultationController.getConsultationsByDoss
 
 /**
  * @swagger
- * /api/consultation/professionnel/{professionnel_id}:
+ * /consultation/professionnel/{professionnel_id}:
  *   get:
  *     summary: Récupérer les consultations par professionnel de santé
  *     tags: [Consultations]
@@ -185,7 +185,7 @@ router.get('/professionnel/:professionnel_id', consultationController.getConsult
 
 /**
  * @swagger
- * /api/consultation:
+ * /consultation:
  *   post:
  *     summary: Créer une nouvelle consultation
  *     tags: [Consultations]
@@ -264,11 +264,11 @@ router.get('/professionnel/:professionnel_id', consultationController.getConsult
  *       500:
  *         description: Erreur serveur
  */
-router.post('/', consultationController.createConsultation);
+router.post('/', attachProfessionnel, consultationController.createConsultation);
 
 /**
  * @swagger
- * /api/consultation/{id}:
+ * /consultation/{id}:
  *   put:
  *     summary: Mettre à jour une consultation
  *     tags: [Consultations]
@@ -353,7 +353,7 @@ router.put('/:id', consultationController.updateConsultation);
 
 /**
  * @swagger
- * /api/consultation/{id}:
+ * /consultation/{id}:
  *   delete:
  *     summary: Supprimer une consultation
  *     tags: [Consultations]

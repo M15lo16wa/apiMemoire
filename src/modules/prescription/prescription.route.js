@@ -53,7 +53,7 @@ const updateValidationRules = [
 
 /**
  * @swagger
- * /api/prescription/ordonnance:
+ * /prescription/ordonnance:
  *   post:
  *     summary: Créer une nouvelle ordonnance
  *     tags: [Prescription]
@@ -149,7 +149,7 @@ router.post('/ordonnance',
 
 /**
  * @swagger
- * /api/prescription/demande-examen:
+ * /prescription/demande-examen:
  *   post:
  *     summary: Créer une demande d'examen
  *     tags: [Prescription]
@@ -229,7 +229,7 @@ router.post('/demande-examen',
 
 /**
  * @swagger
- * /api/prescription/patient/{patient_id}:
+ * /prescription/patient/{patient_id}:
  *   get:
  *     summary: Récupérer les prescriptions d'un patient
  *     tags: [Prescription]
@@ -294,7 +294,7 @@ router.get('/patient/:patient_id',
 
 /**
  * @swagger
- * /api/prescription/{id}:
+ * /prescription/{id}:
  *   get:
  *     summary: Récupérer une prescription par son ID
  *     tags: [Prescription]
@@ -341,7 +341,7 @@ router.get('/:id',
 
 /**
  * @swagger
- * /api/prescription/{id}:
+ * /prescription/{id}:
  *   put:
  *     summary: Mettre à jour une prescription
  *     tags: [Prescription]
@@ -416,7 +416,7 @@ router.put('/:id',
 
 /**
  * @swagger
- * /api/prescription/{id}:
+ * /prescription/{id}:
  *   delete:
  *     summary: Supprimer une prescription
  *     tags: [Prescription]
@@ -445,7 +445,7 @@ router.delete('/:id',
 
 /**
  * @swagger
- * /api/prescription/{id}/renouveler:
+ * /prescription/{id}/renouveler:
  *   patch:
  *     summary: Renouveler une prescription
  *     tags: [Prescription]
@@ -502,7 +502,7 @@ router.patch('/:id/renouveler',
 
 /**
  * @swagger
- * /api/prescription/{id}/suspendre:
+ * /prescription/{id}/suspendre:
  *   patch:
  *     summary: Suspendre une prescription
  *     tags: [Prescription]

@@ -27,8 +27,8 @@ exports.getProfessionnel = catchAsync(async (req, res, next) => {
 
 exports.createProfessionnel = catchAsync(async (req, res, next) => {
   // Assurez-vous que les champs essentiels sont présents
-  if (!req.body.nom || !req.body.prenom || !req.body.date_naissance || !req.body.sexe || !req.body.role) {
-    return next(new AppError('Missing required professional fields (nom, prenom, date_naissance, sexe, role)', 400));
+  if (!req.body.nom || !req.body.prenom || !req.body.date_naissance || !req.body.sexe || !req.body.numero_adeli || !req.body.mot_de_passe || !req.body.role) {
+    return next(new AppError('Missing required professional fields (nom, prenom, date_naissance, sexe, numero_adeli, mot_de_passe, role)', 400));
   }
 
   // Le service gère la logique de liaison et de validation des rôles
