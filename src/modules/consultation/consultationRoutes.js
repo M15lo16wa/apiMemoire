@@ -14,7 +14,6 @@ const attachProfessionnel = require('../../middlewares/attachProfessionnel');
  *         - date_consultation
  *         - motif
  *         - dossier_id
- *         - professionnel_id
  *       properties:
  *         id_consultation:
  *           type: integer
@@ -55,7 +54,10 @@ const attachProfessionnel = require('../../middlewares/attachProfessionnel');
  *           description: ID du dossier médical associé
  *         professionnel_id:
  *           type: integer
- *           description: ID du professionnel de santé
+ *           description: ID du professionnel de santé (injecté automatiquement, ne pas fournir)
+ *         patient_id:
+ *           type: integer
+ *           description: ID du patient (injecté automatiquement, ne pas fournir)
  *         service_id:
  *           type: integer
  *           description: ID du service de santé (optionnel)
@@ -264,7 +266,8 @@ router.get('/professionnel/:professionnel_id', consultationController.getConsult
  *       500:
  *         description: Erreur serveur
  */
-router.post('/', attachProfessionnel, consultationController.createConsultation);
+const { authenticateToken } = require('../../middlewares/auth.middleware');
+router.post('/', authenticateToken, attachProfessionnel, consultationController.createConsultation);
 
 /**
  * @swagger

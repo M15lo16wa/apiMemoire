@@ -47,7 +47,10 @@ const createConsultation = async (req, res) => {
         }
     }
 
-    const userId = req.user ? req.user.id_utilisateur || req.user.id : null;
+
+    // Injection automatique du patient_id (depuis le dossier) et du professionnel_id (depuis la session)
+    const patient_id = dossier.patient_id;
+    const professionnelIdSession = professionnel.id_professionnel;
 
     // Créer la consultation
     const newConsultation = await Consultation.create({
@@ -61,12 +64,13 @@ const createConsultation = async (req, res) => {
         type_consultation,
         confidentialite,
         dossier_id,
-        professionnel_id,
+        patient_id, // injecté automatiquement
+        professionnel_id: professionnelIdSession, // injecté automatiquement
         service_id,
         date_annulation,
         motif_annulation,
-        createdBy: userId,
-        updatedBy: userId,
+        createdBy: req.user && !req.professionnel && (req.user.id_utilisateur || req.user.id) ? (req.user.id_utilisateur || req.user.id) : undefined,
+        updatedBy: req.user && !req.professionnel && (req.user.id_utilisateur || req.user.id) ? (req.user.id_utilisateur || req.user.id) : undefined,
     });
 
     // 5. Répondre au client avec la nouvelle consultation créée
