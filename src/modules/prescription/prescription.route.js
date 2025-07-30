@@ -258,7 +258,7 @@ router.post('/demande-examen',
  *         name: includes
  *         schema:
  *           type: string
- *         description: Modèles à inclure (patient,redacteur,dossier,consultation)
+ *         description: Modèles à inclure (patient,medecin,dossier,consultation)
  *     responses:
  *       200:
  *         description: Liste des prescriptions
@@ -307,11 +307,6 @@ router.get('/patient/:patient_id',
  *         schema:
  *           type: integer
  *         description: ID de la prescription
- *       - in: query
- *         name: includes
- *         schema:
- *           type: string
- *         description: Modèles à inclure (patient,redacteur,dossier,consultation)
  *     responses:
  *       200:
  *         description: Détail de la prescription

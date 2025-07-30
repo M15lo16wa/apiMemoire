@@ -123,30 +123,30 @@ const prescriptionService = {
     /**
      * Récupérer une prescription par son ID
      */
-    async getPrescriptionById(id, includes = []) {
+    async getPrescriptionById(id) {
         try {
-            const includeOptions = [];
+            // const includeOptions = [];
 
-            if (includes.includes('patient')) {
-                includeOptions.push({ model: Patient, as: 'patient' });
-            }
-            if (includes.includes('redacteur')) {
-                includeOptions.push({ 
-                    model: ProfessionnelSante, 
-                    as: 'redacteur',
-                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
-                });
-            }
-            if (includes.includes('dossier')) {
-                includeOptions.push({ model: DossierMedical, as: 'dossier' });
-            }
-            if (includes.includes('consultation')) {
-                includeOptions.push({ model: Consultation, as: 'consultation' });
-            }
+            // if (includes.includes('patient')) {
+            //     includeOptions.push({ model: Patient, as: 'patient' });
+            // }
+            // if (includes.includes('redacteur')) {
+            //     includeOptions.push({ 
+            //         model: ProfessionnelSante, 
+            //         as: 'redacteur',
+            //         include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+            //     });
+            // }
+            // if (includes.includes('dossier')) {
+            //     includeOptions.push({ model: DossierMedical, as: 'dossier' });
+            // }
+            // if (includes.includes('consultation')) {
+            //     includeOptions.push({ model: Consultation, as: 'consultation' });
+            // }
 
-            const prescription = await Prescription.findByPk(id, {
-                include: includeOptions
-            });
+            const prescription = await Prescription.findByPk(id, 
+                // { include: includeOptions }
+            );
 
             return prescription;
         } catch (error) {
