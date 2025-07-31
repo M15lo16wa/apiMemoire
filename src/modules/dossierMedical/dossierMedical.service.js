@@ -21,19 +21,36 @@ async createDossier(dossierData) {
 },
 
 /**
+   * Récupère tous les dossiers médicaux avec seulement l'ID et le statut
+   * @param {object} filters - Filtres à appliquer (ex: { patient_id: 1, statut: 'actif' }).
+   * @returns {Promise<Array<{id_dossier: number, statut: string}>>} Liste des dossiers médicaux avec ID et statut.
+   */
+async getAllDossiers(filters = {}) {
+    try {
+        return await DossierMedical.findAll({
+            where: filters,
+            attributes: ['id_dossier', 'statut'],
+            raw: true
+        });
+    } catch (error) {
+        throw new Error(`Erreur lors de la récupération des dossiers: ${error.message}`);
+    }
+},
+
+/**
    * Récupère tous les dossiers médicaux, avec options de filtrage et d'inclusion.
    * @param {object} filters - Filtres à appliquer (ex: { patient_id: 1, statut: 'Ouvert' }).
    * @param {string[]} includes - Modèles à inclure (ex: ['patient', 'medecinReferent']).
    * @returns {Promise<DossierMedical[]>} Liste des dossiers médicaux.
    */
-async getAllDossiers(filters = {}, includes = []) {
+async getAllDossiersWithIncludes(filters = {}, includes = []) {
     const includeOptions = [];
 
     if (includes.includes('patient')) {
         includeOptions.push({ model: Patient, as: 'patient' });
     }
-    if (includes.includes('medecinReferent')) {
-        includeOptions.push({ model: ProfessionnelSante, as: 'medecinReferent', include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }] });
+    if (includes.includes('professionnelsDuService')) {
+        includeOptions.push({ model: ProfessionnelSante, as: 'professionnelsDuService', include: [{ model: ServiceSante, as: 'serviceSante', attributes: ['nom', 'prenom'] }] });
     }
     if (includes.includes('serviceResponsable')) {
         includeOptions.push({
@@ -44,11 +61,11 @@ async getAllDossiers(filters = {}, includes = []) {
             ]
         });
     }
-    if (includes.includes('createur')) {
-        includeOptions.push({ model: Utilisateur, as: 'createur', attributes: ['nom', 'prenom'] });
-    }
+    // if (includes.includes('createur')) {
+    //     includeOptions.push({ model: Utilisateur, as: 'createur', attributes: ['nom', 'prenom'] });
+    // }
     if (includes.includes('dernierModificateur')) {
-        includeOptions.push({ model: Utilisateur, as: 'dernierModificateur', attributes: ['nom', 'prenom'] });
+        includeOptions.push({ model: ProfessionnelSante, as: 'dernierModificateur', attributes: ['nom', 'prenom'] });
     }
 
     try {
@@ -65,19 +82,46 @@ async getAllDossiers(filters = {}, includes = []) {
 },
 
 /**
- *  Récupère un dossier médical par son ID.
+ *  Récupère un dossier médical par son ID avec les informations du patient incluses par défaut.
+ *  Inclut automatiquement les informations complètes du patient et de son compte utilisateur.
+ *  
  *  @param {number} id_dossier - L'ID du dossier médical.
- *  @param {string[]} includes - Modèles à inclure.
- *  @returns {Promise<DossierMedical|null>} Le dossier médical ou null si non trouvé.
+ *  @param {string[]} [includes=[]] - Modèles supplémentaires à inclure. Peut contenir :
+ *    - 'professionnelsDuService' : Inclut les professionnels du service liés au dossier
+ *    - 'serviceResponsable' : Inclut les informations du service responsable
+ *    - 'createur' : Inclut les informations de l'utilisateur ayant créé le dossier
+ *    - 'dernierModificateur' : Inclut les informations du dernier utilisateur ayant modifié le dossier
+ *  
+ *  @returns {Promise<DossierMedical|null>} Le dossier médical avec les informations du patient incluses, ou null si non trouvé.
+ *  
+ *  @example
+ *  // Retourne le dossier avec les informations du patient incluses
+ *  const dossier = await getDossierById(123);
+ *  
+ *  // Retourne le dossier avec le patient et le service responsable
+ *  const dossierAvecService = await getDossierById(123, ['serviceResponsable']);
  **/
 async getDossierById(id_dossier, includes = []) {
-    const includeOptions = [];
+    // Inclure uniquement les informations du patient de base
+    const includeOptions = [
+        { 
+            model: Patient, 
+            as: 'patient',
+            attributes: ['id_patient', 'numero_dossier', 'nom', 'prenom', 'date_naissance', 'sexe', 'adresse', 'ville', 'code_postal', 'pays', 'telephone', 'email', 'groupe_sanguin']
+        }
+    ];
 
-    if (includes.includes('patient')) {
-        includeOptions.push({ model: Patient, as: 'patient' });
-    }
-    if (includes.includes('medecinReferent')) {
-        includeOptions.push({ model: ProfessionnelSante, as: 'medecinReferent', include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }] });
+    // Ajouter les autres inclusions demandées
+    if (includes.includes('professionnelsDuService')) {
+        includeOptions.push({ 
+            model: ProfessionnelSante, 
+            as: 'professionnelsDuService', 
+            include: [{ 
+                model: ServiceSante, 
+                as: 'serviceSante', 
+                attributes: ['nom', 'prenom'] 
+            }] 
+        });
     }
     if (includes.includes('serviceResponsable')) {
         includeOptions.push({
@@ -89,10 +133,18 @@ async getDossierById(id_dossier, includes = []) {
         });
     }
     if (includes.includes('createur')) {
-        includeOptions.push({ model: Utilisateur, as: 'createur', attributes: ['nom', 'prenom'] });
+        includeOptions.push({ 
+            model: Utilisateur, 
+            as: 'createur', 
+            attributes: ['id_utilisateur', 'nom', 'prenom', 'email'] 
+        });
     }
     if (includes.includes('dernierModificateur')) {
-        includeOptions.push({ model: Utilisateur, as: 'dernierModificateur', attributes: ['nom', 'prenom'] });
+        includeOptions.push({ 
+            model: Utilisateur, 
+            as: 'dernierModificateur', 
+            attributes: ['id_utilisateur', 'nom', 'prenom', 'email'] 
+        });
     }
 
     try {

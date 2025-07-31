@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 const prescriptionController = require('./prescription.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
 const { authenticateToken } = require('../../middlewares/auth.middleware');
@@ -552,6 +552,241 @@ router.patch('/:id/suspendre',
     [body('motif_arret').notEmpty().withMessage('Le motif d\'arrêt est requis').isLength({ max: 500 })], 
     handleValidationErrors, 
     prescriptionController.suspendrePrescription
+);
+
+/**
+ * @swagger
+ * /prescription/{id}/transferer:
+ *   post:
+ *     summary: Transférer une prescription à un patient
+ *     description: Transfère une prescription existante vers le dossier médical d'un autre patient. Cette action est tracée dans l'historique des accès.
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID de la prescription à transférer
+ *         example: ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - patient_id
+ *             properties:
+ *               patient_id:
+ *                 type: integer
+ *                 minimum: 1
+ *                 description: ID du patient destinataire qui recevra la prescription
+ *                 example: ID
+ *           example:
+ *             patient_id: ID
+ *     responses:
+ *       200:
+ *         description: Prescription transférée avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Prescription transférée avec succès"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     prescription:
+ *                       $ref: '#/components/schemas/Prescription'
+ *                     transfert:
+ *                       type: object
+ *                       properties:
+ *                         date:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2025-07-30T10:30:00Z"
+ *                         effectue_par:
+ *                           type: integer
+ *                           example: 789
+ *                         patient_destinataire:
+ *                           type: integer
+ *                           example: 456
+ *       400:
+ *         description: Données de requête invalides
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   examples:
+ *                     missing_patient_id:
+ *                       value: "ID du patient destinataire requis"
+ *                     invalid_prescription_id:
+ *                       value: "ID de prescription invalide"
+ *                     invalid_patient_id:
+ *                       value: "ID du patient destinataire invalide"
+ *       401:
+ *         description: Non autorisé - Token d'authentification requis ou invalide
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Token d'authentification requis"
+ *       403:
+ *         description: Permissions insuffisantes pour effectuer cette action
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Permissions insuffisantes pour transférer cette prescription"
+ *       404:
+ *         description: Ressource non trouvée
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   examples:
+ *                     prescription_not_found:
+ *                       value: "Prescription non trouvée"
+ *                     patient_not_found:
+ *                       value: "Patient destinataire non trouvé"
+ *                     dossier_not_found:
+ *                       value: "Dossier médical du patient destinataire non trouvé"
+ *       500:
+ *         description: Erreur serveur interne
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Impossible de transférer la prescription"
+ */
+router.post('/:id/transferer',
+    authenticateToken,
+    [
+        param('id')
+            .isInt({ min: 1 })
+            .withMessage('ID de prescription invalide'),
+        body('patient_id')
+            .notEmpty()
+            .withMessage('ID du patient destinataire requis')
+            .isInt({ min: 1 })
+            .withMessage('ID du patient destinataire doit être un entier positif')
+    ],
+    handleValidationErrors,
+    prescriptionController.transfererPrescription
+);
+/**
+ * @swagger
+ * /prescription/{id}/transferer:
+ *   get:
+ *     summary: Récupérer une prescription par son ID
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la prescription
+ *     responses:
+ *       200:
+ *         description: Détail de la prescription
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     prescription:
+ *                       $ref: '#/components/schemas/Prescription'
+ *       401:
+ *         description: Non autorisé
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Token d'authentification requis"
+ *       404:
+ *         description: Prescription non trouvée
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Prescription non trouvée"
+ *       500:
+ *         description: Erreur serveur interne
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Erreur lors de la récupération de la prescription"
+ */
+router.get('/:id', 
+    authenticateToken, 
+    prescriptionController.getPrescriptionById
 );
 
 module.exports = router; 

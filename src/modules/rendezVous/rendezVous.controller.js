@@ -1,12 +1,43 @@
+const { Op } = require('sequelize');
 const rendezVousService = require('./rendezVous.service');
 const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/appError');
 
 /**
  * Créer un nouveau rendez-vous
+ * Le corps de la requête peut contenir soit :
+ * - Un patient_id existant
+ * - Les informations complètes d'un nouveau patient (nom, prenom, email, telephone, etc.)
  */
 exports.createRendezVous = catchAsync(async (req, res, next) => {
-  const newRendezVous = await rendezVousService.createRendezVous(req.body);
+  // Normaliser les noms de champs pour gérer les deux formats
+  const rendezVousData = { ...req.body };
+  
+  // Gérer les différentes variantes de noms de champs
+  if (rendezVousData.DateHeure) {
+    rendezVousData.date_heure = rendezVousData.DateHeure;
+    delete rendezVousData.DateHeure;
+  }
+  
+  if (rendezVousData.motif_consultation) {
+    rendezVousData.motif = rendezVousData.motif_consultation;
+    delete rendezVousData.motif_consultation;
+  }
+  
+  // Valider les données requises pour le rendez-vous
+  if (!rendezVousData.date_heure || !rendezVousData.motif || !rendezVousData.service_id) {
+    return next(new AppError('Veuillez fournir la date/heure, le motif et le service pour le rendez-vous', 400));
+  }
+  
+  // Si pas d'ID de patient, vérifier les champs obligatoires pour créer un nouveau patient
+  if (!rendezVousData.patient_id) {
+    if (!rendezVousData.nom || !rendezVousData.prenom || !rendezVousData.email || !rendezVousData.telephone) {
+      return next(new AppError('Pour un nouveau patient, veuillez fournir au moins le nom, prénom, email et téléphone', 400));
+    }
+  }
+  
+  const newRendezVous = await rendezVousService.createRendezVous(rendezVousData);
+  
   res.status(201).json({
     status: 'success',
     data: {
@@ -16,31 +47,45 @@ exports.createRendezVous = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Récupérer tous les rendez-vous
+ * Récupérer tous les rendez-vous (simplifié pour ne retourner que les IDs)
  * Possibilité de filtrer par patient, professionnel, service ou hôpital
  */
 exports.getAllRendezVous = catchAsync(async (req, res, next) => {
-  const { patient_id, professionnel_id, service_id, hopital_id, date_debut, date_fin } = req.query;
+  const { patient_id, id_professionnel, service_id, hopital_id, date_debut, date_fin } = req.query;
   const filters = {};
   
   if (patient_id) filters.patient_id = patient_id;
-  if (professionnel_id) filters.professionnel_id = professionnel_id;
+  if (id_professionnel) filters.id_professionnel = id_professionnel;
   if (service_id) filters.service_id = service_id;
   if (hopital_id) filters.hopital_id = hopital_id;
   
   // Filtrage par plage de dates
   if (date_debut || date_fin) {
-    filters.DateHeure = {};
-    if (date_debut) filters.DateHeure[Op.gte] = new Date(date_debut);
-    if (date_fin) filters.DateHeure[Op.lte] = new Date(date_fin);
+    filters.date_heure = {};
+    if (date_debut) filters.date_heure[Op.gte] = new Date(date_debut);
+    if (date_fin) {
+      // Si on a une date de fin, on inclut tous les rendez-vous qui commencent avant cette date
+      // et qui se terminent après cette date
+      filters[Op.or] = [
+        { date_heure: { [Op.lte]: new Date(date_fin) } },
+        { 
+          date_heure: { [Op.lte]: new Date(date_fin) },
+          date_heure_fin: { [Op.gte]: new Date(date_fin) }
+        }
+      ];
+    }
   }
   
   const rendezVous = await rendezVousService.getAllRendezVous(filters);
+  
   res.status(200).json({
     status: 'success',
     results: rendezVous.length,
     data: {
-      rendezVous
+      rendezVous: rendezVous.map(rv => ({
+        id_rendezvous: rv.id_rendezvous,
+        // Ajouter d'autres champs si nécessaire, mais en gardant la réponse légère
+      }))
     }
   });
 });
@@ -91,12 +136,8 @@ exports.deleteRendezVous = catchAsync(async (req, res, next) => {
  */
 exports.prendreRendezVous = catchAsync(async (req, res, next) => {
   // Vérification des données requises
-  const { nom, prenom, email, dateNaissance, sexe, telephone, DateHeure, motif_consultation, 
-          id_hopital, id_service, id_medecin, numero_assure, assureur } = req.body;
-          
-  if (!nom || !prenom || !email || !dateNaissance || !sexe || !telephone || !DateHeure || 
-      !motif_consultation || !id_hopital || !id_service || !numero_assure || !assureur) {
-    return next(new AppError('Veuillez fournir toutes les informations requises pour le rendez-vous', 400));
+  if (!req.body.patient_id || !req.body.date_heure || !req.body.service_id || !req.body.motif) {
+    return next(new AppError('Veuillez fournir toutes les informations requises (patient_id, date_heure, service_id, motif)', 400));
   }
   
   const newRendezVous = await rendezVousService.prendreRendezVous(req.body);
@@ -113,9 +154,9 @@ exports.prendreRendezVous = catchAsync(async (req, res, next) => {
  * Créer un rappel pour un patient
  */
 exports.creerRappel = catchAsync(async (req, res, next) => {
-  const { patient_id, id_medecin, date_rappel, message, type_rappel, rendez_vous_id } = req.body;
+  const { patient_id, id_professionnel, date_rappel, message, type_rappel, rendezvous_id } = req.body;
   
-  if (!patient_id || !date_rappel || !message) {
+  if (!patient_id || !date_rappel ||!id_professionnel || !message) {
     return next(new AppError('Veuillez fournir patient_id, date_rappel et message', 400));
   }
   

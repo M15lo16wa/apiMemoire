@@ -624,9 +624,9 @@ const swaggerDefinition = {
             type: 'integer',
             description: 'ID du patient'
           },
-          id_medecin: {
+          id_professionnel: {
             type: 'integer',
-            description: 'ID du médecin'
+            description: 'ID du professionnel de santé'
           },
           DateHeure: {
             type: 'string',

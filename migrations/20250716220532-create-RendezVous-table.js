@@ -103,7 +103,7 @@ module.exports = {
         allowNull: false,
         comment: 'ID du patient concerné (géré dans index.js)'
       },
-      professionnel_id: {
+      id_professionnel: {
         type: DataTypes.INTEGER,
         allowNull: true,
         comment: 'ID du professionnel de santé assigné (géré dans index.js)'
@@ -165,7 +165,7 @@ module.exports = {
     // Ajout des index pour les champs fréquemment utilisés dans les requêtes
     await queryInterface.addIndex('RendezVous', ['date_heure']);
     await queryInterface.addIndex('RendezVous', ['patient_id']);
-    await queryInterface.addIndex('RendezVous', ['professionnel_id']);
+    await queryInterface.addIndex('RendezVous', ['id_professionnel']);
     await queryInterface.addIndex('RendezVous', ['service_id']);
     await queryInterface.addIndex('RendezVous', ['salle_id']);
     await queryInterface.addIndex('RendezVous', ['statut']);

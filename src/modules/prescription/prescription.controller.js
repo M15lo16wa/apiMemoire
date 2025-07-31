@@ -102,13 +102,13 @@ exports.createDemandeExamen = catchAsync(async (req, res, next) => {
  */
 exports.getPrescriptionsByPatient = catchAsync(async (req, res, next) => {
     const { patient_id } = req.params;
-    const { statut, type, includes } = req.query;
+    const { statut, type } = req.query;
     
     const filters = { patient_id };
     if (statut) filters.statut = statut;
     if (type) filters.prescrit_traitement = type === 'traitement';
 
-    const includeArray = includes ? includes.split(',') : ['patient', 'redacteur', 'dossier', 'consultation'];
+    // const includeArray = includes ? includes.split(',') : ['patient', 'redacteur', 'dossier', 'consultation'];
     
     const prescriptions = await prescriptionService.getPrescriptionsByPatient(patient_id, filters);
     
@@ -237,6 +237,88 @@ exports.suspendrePrescription = catchAsync(async (req, res, next) => {
             prescription: prescriptionSuspendue
         }
     });
+});
+
+/** 
+ * transferer une prescription à un patient
+*/
+exports.transfererPrescription = catchAsync(async (req, res, next) => {
+    const { id } = req.params;
+    const { patient_id } = req.body;
+
+    // 1. Validation des paramètres
+    if (!patient_id) {
+        return next(new AppError('ID du patient destinataire requis', 400));
+    }
+
+    // Validation que l'ID de prescription est un nombre valide
+    if (!id || isNaN(parseInt(id))) {
+        return next(new AppError('ID de prescription invalide', 400));
+    }
+
+    // Validation que patient_id est un nombre valide
+    if (isNaN(parseInt(patient_id))) {
+        return next(new AppError('ID du patient destinataire invalide', 400));
+    }
+
+    try {
+        // 3. Appel au service avec l'ID utilisateur pour la traçabilité
+        const prescriptionTransferee = await prescriptionService.transfererPrescription(
+            parseInt(id), 
+            parseInt(patient_id), 
+            req.user.id
+        );
+
+        // 4. Réponse de succès avec informations détaillées
+        res.status(200).json({
+            status: 'success',
+            message: 'Prescription transférée avec succès',
+            data: {
+                prescription: prescriptionTransferee,
+                transfert: {
+                    date: new Date(),
+                    effectue_par: req.user.id,
+                    patient_destinataire: patient_id
+                }
+            }
+        });
+
+    } catch (error) {
+        // 5. Le service lance déjà des AppError, donc on les propage
+        return next(error);
+    }
+
+    /** 
+     * * recuperation de la prescription transmise à un patient
+     * */
+    exports.getPrescriptionTransmise = catchAsync(async (req, res, next) => {
+        const { id } = req.params;
+
+        // Validation que l'ID de prescription est un nombre valide
+        if (!id || isNaN(parseInt(id))) {
+            return next(new AppError('ID de prescription invalide', 400));
+        }
+
+        try {
+            // Appel au service pour récupérer la prescription transmise
+            const prescriptionTransmise = await prescriptionService.getPrescriptionTransmise(parseInt(id));
+
+            if (!prescriptionTransmise) {
+                return next(new AppError('Prescription transmise non trouvée', 404));
+            }
+
+            res.status(200).json({
+                status: 'success',
+                data: {
+                    prescription: prescriptionTransmise
+                }
+            });
+
+        } catch (error) {
+            return next(error);
+        }
+    });
+
 });
 
 module.exports = exports; 

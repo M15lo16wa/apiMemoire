@@ -25,49 +25,120 @@ exports.createRendezVous = async (rendezVousData) => {
       }
     }
     
-    // Vérifier que le médecin existe si spécifié
-    if (rendezVousData.id_medecin) {
-      const medecin = await ProfessionnelSante.findByPk(rendezVousData.id_medecin);
-      if (!medecin) {
+    // Vérifier que le professionnel de santé existe si spécifié
+    if (rendezVousData.id_professionnel) {
+      const professionnel = await ProfessionnelSante.findByPk(rendezVousData.id_professionnel);
+      if (!professionnel) {
         throw new AppError('Professionnel de santé non trouvé', 404);
       }
     }
     
-    // Vérifier que le patient existe si spécifié
+    // Gestion du patient
+    let patient;
+    
+    // Si on a un ID de patient, on vérifie qu'il existe
     if (rendezVousData.patient_id) {
-      const patient = await Patient.findByPk(rendezVousData.patient_id);
+      patient = await Patient.findByPk(rendezVousData.patient_id);
       if (!patient) {
         throw new AppError('Patient non trouvé', 404);
       }
+    } 
+    // Sinon, on vérifie qu'on a les informations nécessaires pour créer un nouveau patient
+    else if (rendezVousData.nom && rendezVousData.prenom && rendezVousData.email && rendezVousData.telephone) {
+      // Création d'un nouveau patient
+      const patientData = {
+        nom: rendezVousData.nom,
+        prenom: rendezVousData.prenom,
+        email: rendezVousData.email,
+        telephone: rendezVousData.telephone,
+        date_naissance: rendezVousData.dateNaissance || rendezVousData.date_naissance,
+        sexe: rendezVousData.sexe,
+        // Autres champs optionnels
+        adresse: rendezVousData.adresse,
+        code_postal: rendezVousData.code_postal,
+        ville: rendezVousData.ville,
+        pays: rendezVousData.pays || 'France',
+        // Par défaut, on considère que c'est un nouveau patient
+        est_nouveau: true
+      };
+      
+      // Nettoyer les champs undefined
+      Object.keys(patientData).forEach(key => patientData[key] === undefined && delete patientData[key]);
+      
+      patient = await Patient.create(patientData);
+      
+      // On met à jour l'ID du patient dans les données du rendez-vous
+      rendezVousData.patient_id = patient.id_patient || patient.id;
+    } else {
+      throw new AppError('Informations du patient manquantes. Veuillez fournir soit un ID de patient valide, soit les informations complètes pour créer un nouveau patient (nom, prénom, email, téléphone).', 400);
     }
     
+    // Nettoyer les données du rendez-vous
+    const champsRendezVous = [
+      'date_heure', 'date_heure_fin', 'motif', 'description', 'statut',
+      'type_rendezvous', 'duree', 'rappel_envoye', 'date_rappel',
+      'patient_id', 'id_professionnel', 'service_id', 'salle_id',
+      'notes', 'date_annulation', 'motif_annulation', 'id_hopital',
+      'numero_assure', 'assureur'
+    ];
+    
+    const donneesRendezVous = {};
+    champsRendezVous.forEach(champ => {
+      if (rendezVousData[champ] !== undefined) {
+        donneesRendezVous[champ] = rendezVousData[champ];
+      }
+    });
+    
+    // Définir les valeurs par défaut si nécessaire
+    if (!donneesRendezVous.statut) donneesRendezVous.statut = 'planifie';
+    if (!donneesRendezVous.type_rendezvous) donneesRendezVous.type_rendezvous = 'consultation';
+    if (!donneesRendezVous.duree) donneesRendezVous.duree = 30;
+    
     // Vérifier la disponibilité du créneau
-    if (rendezVousData.DateHeure && rendezVousData.id_medecin) {
-      const dateHeure = new Date(rendezVousData.DateHeure);
-      const duree = rendezVousData.duree || 30; // Durée par défaut de 30 minutes
-      
-      const dateHeureDebut = new Date(dateHeure);
-      const dateHeureFin = new Date(dateHeure);
-      dateHeureFin.setMinutes(dateHeureFin.getMinutes() + duree);
-      
-      const rendezVousExistant = await RendezVous.findOne({
+    if (!rendezVousData.date_heure) {
+      throw new AppError('La date et l\'heure du rendez-vous sont requises', 400);
+    }
+    
+    const dateHeure = new Date(rendezVousData.date_heure);
+    const duree = rendezVousData.duree || 30; // Durée par défaut de 30 minutes
+    
+    const dateHeureDebut = new Date(dateHeure);
+    const dateHeureFin = new Date(dateHeure);
+    dateHeureFin.setMinutes(dateHeureFin.getMinutes() + duree);
+    
+    // Mettre à jour la date de fin dans les données
+    rendezVousData.date_heure_fin = dateHeureFin;
+    
+    // Vérifier la disponibilité du professionnel
+    if (rendezVousData.id_professionnel) {
+      const conflitRendezVous = await RendezVous.findOne({
         where: {
-          id_medecin: rendezVousData.id_medecin,
-          DateHeure: {
-            [Op.between]: [dateHeureDebut, dateHeureFin]
-          },
+          id_professionnel: rendezVousData.id_professionnel,
+          [Op.or]: [
+            // Le nouveau rendez-vous commence pendant un autre rendez-vous
+            {
+              date_heure: { [Op.lt]: dateHeureFin },
+              date_heure_fin: { [Op.gt]: dateHeureDebut }
+            },
+            // Le nouveau rendez-vous contient un autre rendez-vous
+            {
+              date_heure: { [Op.gte]: dateHeureDebut },
+              date_heure: { [Op.lte]: dateHeureFin }
+            }
+          ],
           statut: {
-            [Op.notIn]: ['Annulé', 'Terminé']
-          }
+            [Op.notIn]: ['annule', 'termine']
+          },
+          id_rendezvous: { [Op.ne]: rendezVousData.id_rendezvous || null }
         }
       });
       
-      if (rendezVousExistant) {
-        throw new AppError('Ce créneau horaire est déjà réservé pour ce médecin', 400);
+      if (conflitRendezVous) {
+        throw new AppError('Ce créneau horaire est déjà réservé pour ce professionnel de santé', 400);
       }
     }
     
-    const newRendezVous = await RendezVous.create(rendezVousData);
+    const newRendezVous = await RendezVous.create(donneesRendezVous);
     return newRendezVous;
   } catch (error) {
     if (error instanceof AppError) throw error;
@@ -78,19 +149,25 @@ exports.createRendezVous = async (rendezVousData) => {
 /**
  * Récupérer tous les rendez-vous avec filtres optionnels
  * @param {Object} filters - Filtres à appliquer
- * @returns {Promise<RendezVous[]>} Liste des rendez-vous
+ * @returns {Promise<Array<{id_rendezvous: number}>>} Liste des IDs des rendez-vous
  */
 exports.getAllRendezVous = async (filters = {}) => {
+  const whereClause = {};
+  
+  // Ajouter les filtres à la clause where
+  Object.keys(filters).forEach(key => {
+    if (key === 'date_heure') {
+      whereClause[key] = filters[key];
+    } else if (filters[key] !== undefined) {
+      whereClause[key] = filters[key];
+    }
+  });
+  
   try {
     return await RendezVous.findAll({
-      where: filters,
-      include: [
-        { model: Hopital, as: 'hopital' },
-        { model: ServiceSante, as: 'service' },
-        { model: ProfessionnelSante, as: 'affecteA' },
-        { model: Patient, as: 'patientConcerne' }
-      ],
-      order: [['DateHeure', 'ASC']]
+      where: whereClause,
+      attributes: ['id_rendezvous'],
+      raw: true
     });
   } catch (error) {
     throw new AppError(`Erreur lors de la récupération des rendez-vous: ${error.message}`, 500);
@@ -198,7 +275,7 @@ exports.prendreRendezVous = async (rendezVousData) => {
  */
 exports.creerRappel = async (rappelData) => {
   try {
-    const { patient_id, id_medecin, date_rappel, message, type_rappel, rendez_vous_id } = rappelData;
+    const { patient_id, id_professionnel, date_rappel, message, type_rappel, rendezvous_id } = rappelData;
     
     // Vérifier que le patient existe
     if (patient_id) {
@@ -209,16 +286,16 @@ exports.creerRappel = async (rappelData) => {
     }
     
     // Vérifier que le médecin existe
-    if (id_medecin) {
-      const medecin = await ProfessionnelSante.findByPk(id_medecin);
+    if (id_professionnel) {
+      const medecin = await ProfessionnelSante.findByPk(id_professionnel);
       if (!medecin) {
         throw new AppError('Professionnel de santé non trouvé', 404);
       }
     }
     
     // Vérifier que le rendez-vous existe si spécifié
-    if (rendez_vous_id) {
-      const rendezVous = await RendezVous.findByPk(rendez_vous_id);
+    if (rendezvous_id) {
+      const rendezVous = await RendezVous.findByPk(rendezvous_id);
       if (!rendezVous) {
         throw new AppError('Rendez-vous non trouvé', 404);
       }
@@ -227,13 +304,17 @@ exports.creerRappel = async (rappelData) => {
     // Créer le rappel (pour l'instant, on stocke dans la table RendezVous avec un type spécial)
     const rappel = await RendezVous.create({
       patient_id,
-      id_medecin,
-      DateHeure: date_rappel,
-      motif_consultation: message,
-      statut: 'Rappel',
+      id_professionnel,
+      date_heure: date_rappel,
+      motif: message,
+      description: `Rappel: ${message}`,
+      statut: 'planifie',
+      type_rendezvous: 'rappel',
+      service_id: 1, // Service par défaut pour les rappels
+      duree: 0, // Pas de durée pour un rappel
+      rappel_envoye: false,
       type_rappel: type_rappel || 'general',
-      rendez_vous_id,
-      duree: 0 // Pas de durée pour un rappel
+      rendezvous_id
     });
     
     return rappel;
@@ -258,14 +339,17 @@ exports.getRappelsByPatient = async (patientId, filters = {}) => {
     };
     
     return await RendezVous.findAll({
-      where: whereClause,
+      where: {
+        ...whereClause,
+        type_rendezvous: 'rappel'
+      },
       include: [
         { model: Hopital, as: 'hopital' },
         { model: ServiceSante, as: 'service' },
         { model: ProfessionnelSante, as: 'affecteA' },
         { model: Patient, as: 'patientConcerne' }
       ],
-      order: [['DateHeure', 'ASC']]
+      order: [['date_heure', 'ASC']]
     });
   } catch (error) {
     throw new AppError(`Erreur lors de la récupération des rappels: ${error.message}`, 500);
@@ -281,11 +365,12 @@ exports.getRappelsAEnvoyer = async (dateLimite = new Date()) => {
   try {
     return await RendezVous.findAll({
       where: {
-        statut: 'Rappel',
-        DateHeure: {
-          [Op.gte]: dateLimite
+        type_rendezvous: 'rappel',
+        rappel_envoye: false,
+        date_heure: {
+          [Op.lte]: dateLimite
         },
-        envoye: false // Champ à ajouter pour tracker l'envoi
+        statut: 'planifie'
       },
       include: [
         { model: Patient, as: 'patientConcerne' },
@@ -331,11 +416,14 @@ exports.getRendezVousAVenir = async (patientId, limit = 10) => {
     return await RendezVous.findAll({
       where: {
         patient_id: patientId,
-        DateHeure: {
+        date_heure: {
           [Op.gte]: new Date()
         },
+        type_rendezvous: {
+          [Op.ne]: 'rappel' // Exclure les rappels
+        },
         statut: {
-          [Op.in]: ['Planifié', 'Confirmé']
+          [Op.in]: ['planifie', 'confirme']
         }
       },
       include: [

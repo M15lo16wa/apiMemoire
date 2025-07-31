@@ -273,7 +273,100 @@ const prescriptionService = {
             console.error('Erreur lors de la récupération des prescriptions actives:', error);
             throw new AppError('Impossible de récupérer les prescriptions actives', 500);
         }
+    },
+
+    /**
+     * transmettre une prescription à un patient 
+     */
+async transfererPrescription(id, patientId) {
+    try {
+        // 1. Vérifier que la prescription existe
+        const prescription = await Prescription.findByPk(id);
+        if (!prescription) {
+            throw new AppError('Prescription non trouvée', 404);
+        }
+
+        // 2. Vérifier que le patient destinataire existe
+        const patient = await Patient.findByPk(patientId);
+        if (!patient) {
+            throw new AppError('Patient destinataire non trouvé', 404);
+        }
+
+        // 3. Récupérer le dossier médical du patient destinataire
+        const dossierMedical = await DossierMedical.findOne({
+            where: { patient_id: patientId }
+        });
+        
+        if (!dossierMedical) {
+            throw new AppError('Dossier médical du patient destinataire non trouvé', 404);
+        }
+
+        
+        // 4. Mettre à jour la prescription avec le nouveau dossier médical
+        await prescription.update({ 
+            dossier_id: dossierMedical.id_dossier,
+            date_modification: new Date() // Si vous avez ce champ
+        });
+
+        
+
+        // 6. Retourner la prescription mise à jour avec les relations
+        const prescriptionUpdated = await Prescription.findByPk(id, {
+            include: [
+                {
+                    model: DossierMedical,
+                    as: 'dossier',
+                    include: [{ model: Patient, 
+                        as: 'patient' 
+                    }]
+                }
+            ]
+        });
+
+        return prescriptionUpdated;
+
+    } catch (error) {
+        console.error('Erreur lors de la transmission de la prescription:', error);
+        
+        // Si c'est déjà une AppError, la relancer
+        if (error instanceof AppError) {
+            throw error;
+        }
+        
+        // Sinon, créer une nouvelle AppError générique
+        throw new AppError('Impossible de transmettre la prescription', 500);
     }
-};
+},
+
+    /**
+     * affichage de la prescription transmise au niveau du patient
+     */
+async getPrescriptionTransmise(patientId, prescriptionId) {
+    try {
+        const prescription = await Prescription.findOne({
+            where: {
+                id_prescription: prescriptionId,
+                patient_id: patientId
+            },
+            include: [
+                { model: Patient, as: 'patient' },
+                { 
+                    model: ProfessionnelSante, 
+                    as: 'redacteur',
+                    include: [{ model: Utilisateur, as: 'compteUtilisateur', attributes: ['nom', 'prenom'] }]
+                }
+            ]
+        });
+
+        if (!prescription) {
+            throw new AppError('Prescription non trouvée pour ce patient', 404);
+        }
+
+        return prescription;
+        } catch (error) {
+            console.error('Erreur lors de la récupération de la prescription transmise:', error);
+            throw new AppError('Impossible de récupérer la prescription transmise', 500);}
+        }
+    }
 
 module.exports = prescriptionService; 

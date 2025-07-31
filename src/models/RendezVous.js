@@ -7,67 +7,90 @@ module.exports = (sequelize) => {
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
+      comment: 'Identifiant unique du rendez-vous'
     },
-    nom: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    prenom: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    email: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    dateNaissance: {
-      type: DataTypes.DATEONLY,
-      allowNull: false,
-    },
-    sexe: {
-      type: DataTypes.ENUM('Masculin', 'Feminin', 'Autre','Inconnu'),
-      allowNull: false,
-    },
-    telephone: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    DateHeure: { 
+    date_heure: {
       type: DataTypes.DATE,
       allowNull: false,
+      comment: 'Date et heure du rendez-vous'
     },
-    motif_consultation: {
+    date_heure_fin: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date et heure de fin du rendez-vous'
+    },
+    motif: {
       type: DataTypes.STRING(255),
       allowNull: false,
+      comment: 'Motif de la consultation'
     },
-    statut: { 
-      type: DataTypes.ENUM('Planifié', 'Confirmé', 'Annulé', 'Terminé'),
-      defaultValue: 'Planifié',
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Description détaillée de la consultation'
+    },
+    statut: {
+      type: DataTypes.ENUM('planifie', 'confirme', 'en_attente', 'en_cours', 'termine', 'annule', 'reporte'),
+      defaultValue: 'planifie',
       allowNull: false,
+      comment: 'Statut du rendez-vous'
     },
-    id_hopital: {
+    type_rendezvous: {
+      type: DataTypes.ENUM('consultation', 'controle', 'urgence', 'bilan', 'autre'),
+      defaultValue: 'consultation',
+      allowNull: false,
+      comment: 'Type de rendez-vous'
+    },
+    duree: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      defaultValue: 30,
+      comment: 'Durée prévue en minutes'
     },
-    id_service: {
+    rappel_envoye: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Indique si un rappel a été envoyé'
+    },
+    date_rappel: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date à laquelle le rappel a été envoyé'
+    },
+    patient_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      comment: 'ID du patient concerné'
     },
-    id_medecin: {
+    id_professionnel: {
       type: DataTypes.INTEGER,
       allowNull: true,
+      comment: 'ID du professionnel de santé assigné'
     },
-    numero_assure: {
-      type: DataTypes.STRING,
+    service_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
+      comment: 'ID du service concerné'
     },
-    assureur: {
-      type: DataTypes.STRING,
-      allowNull: false,
+    salle_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'ID de la salle affectée'
     },
     notes: {
       type: DataTypes.TEXT,
       allowNull: true,
+      comment: 'Notes complémentaires sur le rendez-vous'
+    },
+    date_annulation: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date à laquelle le rendez-vous a été annulé'
+    },
+    motif_annulation: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      comment: 'Raison de l\'annulation du rendez-vous'
     },
   }, {
     tableName: 'RendezVous',
@@ -75,4 +98,4 @@ module.exports = (sequelize) => {
   });
 
   return RendezVous;
-};  
+}; 

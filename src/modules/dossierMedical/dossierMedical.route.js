@@ -150,7 +150,7 @@ const { authenticateToken } = require('../../middlewares/auth.middleware');
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: patientId
+ *         name: patient_id
  *         schema:
  *           type: integer
  *         description: Filtrer par ID du patient
@@ -160,20 +160,34 @@ const { authenticateToken } = require('../../middlewares/auth.middleware');
  *           type: string
  *           enum: [actif, ferme, archive, fusionne]
  *         description: Filtrer par statut
- *       - in: query
- *         name: includes
- *         schema:
- *           type: string
- *         description: Modèles à inclure (patient,medecinReferent,serviceResponsable,createur,dernierModificateur)
  *     responses:
  *       200:
- *         description: Liste des dossiers médicaux récupérée avec succès
+ *         description: Liste des dossiers médicaux récupérée avec succès (format simplifié)
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/DossierMedical'
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: 'success'
+ *                 results:
+ *                   type: integer
+ *                   example: 5
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     dossiers:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id_dossier:
+ *                             type: integer
+ *                             example: 1
+ *                           statut:
+ *                             type: string
+ *                             example: 'actif'
  *       401:
  *         description: Non autorisé
  *       500:
@@ -191,12 +205,7 @@ const { authenticateToken } = require('../../middlewares/auth.middleware');
  *         required: true
  *         schema:
  *           type: integer
- *         description: ID du dossier médical
- *       - in: query
- *         name: includes
- *         schema:
- *           type: string
- *         description: Modèles à inclure (patient,medecinReferent,serviceResponsable,createur,dernierModificateur)
+ *         description: Recuperer un dossier médical par son ID
  *     responses:
  *       200:
  *         description: Dossier médical récupéré avec succès

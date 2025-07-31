@@ -26,7 +26,7 @@ ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'validateur_id', as: 'val
 // Associations pour RendezVous
 RendezVous.belongsTo(Hopital, { foreignKey: 'id_hopital' });
 RendezVous.belongsTo(ServiceSante, { foreignKey: 'id_service' });
-RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'id_medecin', allowNull: true });
+RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'id_professionnel', as: 'professionnel', allowNull: true });
 
 // 1. Aucune relation directe entre Utilisateur et Patient selon le diagramme
 
@@ -63,8 +63,8 @@ ProfessionnelSante.hasMany(Prescription, { foreignKey: 'professionnel_id', as: '
 Prescription.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'redacteur' });
 
 // 9. ProfessionnelSante et RendezVous (One-to-Many)
-ProfessionnelSante.hasMany(RendezVous, { foreignKey: 'professionnel_id', as: 'rendezVousAffectes', onDelete: 'SET NULL' });
-RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'affecteA' });
+ProfessionnelSante.hasMany(RendezVous, { foreignKey: 'id_professionnel', as: 'rendezVousAffectes', onDelete: 'SET NULL' });
+RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'id_professionnel', as: 'affecteA' });
 
 // 10. Patient et RendezVous (One-to-Many)
 Patient.hasMany(RendezVous, { foreignKey: 'patient_id', as: 'rendezVous', onDelete: 'CASCADE' });

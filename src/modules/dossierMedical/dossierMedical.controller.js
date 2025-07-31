@@ -67,23 +67,32 @@ exports.createDossier = async (req, res) => {
 };
 
 /**
- * Récupère tous les dossiers médicaux.
+ * Récupère tous les dossiers médicaux (simplifié pour ne retourner que l'ID et le statut).
  * @param {object} req - L'objet de requête Express.
  * @param {object} res - L'objet de réponse Express.
  */
 exports.getAllDossiers = async (req, res) => {
     try {
-        const { patientId, statut, includes } = req.query;
+        const { patient_id, statut } = req.query;
         const filters = {};
-        if (patientId) filters.patient_id = patientId;
+        if (patient_id) filters.patient_id = patient_id;
         if (statut) filters.statut = statut;
 
-        const includeArray = includes ? includes.split(',') : ['patient', 'medecinReferent', 'serviceResponsable', 'createur', 'dernierModificateur'];
-
-        const dossiers = await dossierMedicalService.getAllDossiers(filters, includeArray);
-        res.status(200).json(dossiers);
+        const dossiers = await dossierMedicalService.getAllDossiers(filters);
+        res.status(200).json({
+            status: 'success',
+            results: dossiers.length,
+            data: {
+                dossiers
+            }
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('Erreur lors de la récupération des dossiers:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Une erreur est survenue lors de la récupération des dossiers',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 
@@ -95,10 +104,10 @@ exports.getAllDossiers = async (req, res) => {
 exports.getDossierById = async (req, res) => {
     try {
         const { id } = req.params;
-        const { includes } = req.query;
-        const includeArray = includes ? includes.split(',') : ['patient', 'medecinReferent', 'serviceResponsable', 'createur', 'dernierModificateur'];
+        // const { includes } = req.query;
+        // const includeArray = includes ? includes.split(',') : ['patient', 'medecinReferent', 'serviceResponsable', 'createur', 'dernierModificateur'];
 
-        const dossier = await dossierMedicalService.getDossierById(id, includeArray);
+        const dossier = await dossierMedicalService.getDossierById(id);
         if (!dossier) {
             return res.status(404).json({ message: 'Dossier médical non trouvé.' });
         }

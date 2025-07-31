@@ -17,7 +17,7 @@ const rendezVousValidationRules = [
     body('DateHeure').notEmpty().withMessage('La date et heure sont requises').isISO8601(),
     body('motif_consultation').notEmpty().withMessage('Le motif de consultation est requis').isLength({ max: 500 }),
     body('patient_id').optional().isInt().withMessage('L\'ID du patient doit être un entier'),
-    body('id_medecin').optional().isInt().withMessage('L\'ID du médecin doit être un entier'),
+    body('id_professionnel').optional().isInt().withMessage('L\'ID du professionnel de santé doit être un entier'),
     body('id_service').optional().isInt().withMessage('L\'ID du service doit être un entier'),
     body('id_hopital').optional().isInt().withMessage('L\'ID de l\'hôpital doit être un entier'),
     body('duree').optional().isInt({ min: 15, max: 480 }).withMessage('La durée doit être entre 15 et 480 minutes'),
@@ -29,7 +29,7 @@ const rappelValidationRules = [
     body('patient_id').notEmpty().withMessage('L\'ID du patient est requis').isInt(),
     body('date_rappel').notEmpty().withMessage('La date du rappel est requise').isISO8601(),
     body('message').notEmpty().withMessage('Le message est requis').isLength({ max: 500 }),
-    body('id_medecin').optional().isInt().withMessage('L\'ID du médecin doit être un entier'),
+    body('id_professionnel').optional().isInt().withMessage('L\'ID du professionnel de santé doit être un entier'),
     body('type_rappel').optional().isIn(['general', 'medicament', 'examen', 'consultation']),
     body('rendez_vous_id').optional().isInt().withMessage('L\'ID du rendez-vous doit être un entier')
 ];
@@ -84,7 +84,7 @@ const rappelValidationRules = [
  *                 type: integer
  *               id_service:
  *                 type: integer
- *               id_medecin:
+ *               id_professionnel:
  *                 type: integer
  *               numero_assure:
  *                 type: string
@@ -103,7 +103,7 @@ const rappelValidationRules = [
  *         description: Erreur serveur
  *
  *   get:
- *     summary: Récupérer tous les rendez-vous
+ *     summary: Récupérer tous les rendez-vous (format simplifié)
  *     tags: [RendezVous]
  *     security:
  *       - bearerAuth: []
@@ -142,7 +142,29 @@ const rappelValidationRules = [
  *         description: Date de fin pour filtrer les rendez-vous
  *     responses:
  *       200:
- *         description: Liste des rendez-vous
+ *         description: Liste des rendez-vous (format simplifié)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: 'success'
+ *                 results:
+ *                   type: integer
+ *                   example: 5
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     rendezVous:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id_rendezvous:
+ *                             type: integer
+ *                             example: 1
  *       401:
  *         description: Non authentifié
  *       500:
@@ -288,7 +310,7 @@ const rappelValidationRules = [
  *                 type: integer
  *               id_service:
  *                 type: integer
- *               id_medecin:
+ *               id_professionnel:
  *                 type: integer
  *               numero_assure:
  *                 type: string
