@@ -19,6 +19,14 @@ ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'prescripteur_id', as: 'p
 ProfessionnelSante.hasMany(ExamenLabo, { foreignKey: 'validateur_id', as: 'examensValides', onDelete: 'SET NULL' });
 ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'validateur_id', as: 'validateur' });
 
+// 20. Patient et ExamenLabo (One-to-Many) - Direct relationship from UML
+Patient.hasMany(ExamenLabo, { foreignKey: 'patient_id', as: 'examensLabo', onDelete: 'CASCADE' });
+ExamenLabo.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
+
+// 21. Consultation et ExamenLabo (One-to-Many) - exams can be linked to consultations
+Consultation.hasMany(ExamenLabo, { foreignKey: 'consultation_id', as: 'examensLabo', onDelete: 'SET NULL' });
+ExamenLabo.belongsTo(Consultation, { foreignKey: 'consultation_id', as: 'consultation' });
+
 
 // --- Définir les associations ---
 // Utilisez les noms de modèles et les clés étrangères que nous avons analysées
@@ -28,7 +36,9 @@ RendezVous.belongsTo(Hopital, { foreignKey: 'id_hopital' });
 RendezVous.belongsTo(ServiceSante, { foreignKey: 'id_service' });
 RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'id_professionnel', as: 'professionnel', allowNull: true });
 
-// 1. Aucune relation directe entre Utilisateur et Patient selon le diagramme
+// 1. Utilisateur et Patient (One-to-One) - Based on UML diagram authentication relationship
+Utilisateur.hasOne(Patient, { foreignKey: 'utilisateur_id', as: 'patientLie', onDelete: 'SET NULL' });
+Patient.belongsTo(Utilisateur, { foreignKey: 'utilisateur_id', as: 'compteUtilisateur' });
 
 // 2. Utilisateur et ProfessionnelSante (One-to-One)
 Utilisateur.hasOne(ProfessionnelSante, { foreignKey: 'utilisateur_id', as: 'professionnelLie', onDelete: 'SET NULL' });
@@ -74,6 +84,14 @@ RendezVous.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patientConcerne' 
 ProfessionnelSante.hasMany(HistoriqueAccess, { foreignKey: 'professionnel_id', as: 'historiquesAcces', onDelete: 'SET NULL' });
 HistoriqueAccess.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnelAccedant' });
 
+// 11.1. Patient et AutorisationAcces (One-to-Many) - patients can have multiple access authorizations
+Patient.hasMany(AutorisationAcces, { foreignKey: 'patient_id', as: 'autorisationsRecues', onDelete: 'CASCADE' });
+AutorisationAcces.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patientConcerne' });
+
+// 11.2. ProfessionnelSante et AutorisationAcces (requesting professional)
+ProfessionnelSante.hasMany(AutorisationAcces, { foreignKey: 'professionnel_id', as: 'autorisationsDemandees', onDelete: 'SET NULL' });
+AutorisationAcces.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnelDemandeur' });
+
 // 12. HistoriqueAccess et AutorisationAcces (One-to-One) - si une auto. a 1 historique et vice-versa
 HistoriqueAccess.hasOne(AutorisationAcces, { foreignKey: 'historique_id', as: 'autorisationLiee', onDelete: 'CASCADE' });
 AutorisationAcces.belongsTo(HistoriqueAccess, { foreignKey: 'historique_id', as: 'historique' });
@@ -81,6 +99,10 @@ AutorisationAcces.belongsTo(HistoriqueAccess, { foreignKey: 'historique_id', as:
 // 13. ProfessionnelSante et AutorisationAcces (One-to-Many - l'autorisateur)
 ProfessionnelSante.hasMany(AutorisationAcces, { foreignKey: 'autorisateur_id', as: 'autorisationsDonnees', onDelete: 'SET NULL' });
 AutorisationAcces.belongsTo(ProfessionnelSante, { foreignKey: 'autorisateur_id', as: 'autorisateur' });
+
+// 13.1. ServiceSante et ExamenLabo (One-to-Many) - exams can be associated with services
+ServiceSante.hasMany(ExamenLabo, { foreignKey: 'service_id', as: 'examensService', onDelete: 'SET NULL' });
+ExamenLabo.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'service' });
 
 
 // 14. Hopital et ServiceSante (One-to-Many)

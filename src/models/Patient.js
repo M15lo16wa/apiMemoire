@@ -8,11 +8,6 @@ module.exports = (sequelize) => {
       autoIncrement: true,
       allowNull: false,
     },
-    numero_dossier: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
-      unique: true,
-    },
     nom: {
       type: DataTypes.STRING(100),
       allowNull: false,
@@ -25,49 +20,15 @@ module.exports = (sequelize) => {
       type: DataTypes.DATEONLY,
       allowNull: false,
     },
-    lieu_naissance: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
     sexe: {
       type: DataTypes.ENUM('M', 'F', 'X', 'I'),
       allowNull: false,
-    },
-    civilite: {
-      type: DataTypes.ENUM('M.', 'Mme', 'Mlle', 'Dr', 'Pr'),
-      allowNull: true,
-    },
-    numero_secu: {
-      type: DataTypes.STRING(15),
-      allowNull: true,
-      unique: true,
     },
     adresse: {
       type: DataTypes.STRING(255),
       allowNull: true,
     },
-    complement_adresse: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-    code_postal: {
-      type: DataTypes.STRING(10),
-      allowNull: true,
-    },
-    ville: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-    pays: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
-      defaultValue: 'France',
-    },
     telephone: {
-      type: DataTypes.STRING(20),
-      allowNull: true,
-    },
-    telephone_secondaire: {
       type: DataTypes.STRING(20),
       allowNull: true,
     },
@@ -76,92 +37,44 @@ module.exports = (sequelize) => {
       allowNull: true,
       unique: true,
     },
-    profession: {
-      type: DataTypes.STRING(100),
+    identifiantNational: {
+      type: DataTypes.STRING(50),
       allowNull: true,
-    },
-    groupe_sanguin: {
-      type: DataTypes.ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Inconnu'),
-      allowNull: false,
-      defaultValue: 'Inconnu',
-    },
-    poids: {
-      type: DataTypes.DECIMAL(5, 2),
-      allowNull: true,
-    },
-    taille: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
-    photo: {
-      type: DataTypes.STRING(255),
-      allowNull: true,
-    },
-    assure: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true,
-    },
-    nom_assurance: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
+      comment: 'Identifiant national du patient (numéro sécurité sociale, etc.)'
     },
     numero_assure: {
       type: DataTypes.STRING(50),
-      allowNull: true,
+      allowNull: false,
+      unique: true,
+      comment: 'Numéro d\'assuré pour l\'authentification du patient'
     },
-    date_premiere_consultation: {
-      type: DataTypes.DATEONLY,
-      allowNull: true,
-    },
-    date_derniere_consultation: {
-      type: DataTypes.DATEONLY,
-      allowNull: true,
-    },
-    personne_contact: {
+    nom_assurance: {
       type: DataTypes.STRING(100),
-      allowNull: true,
-    },
-    telephone_urgence: {
-      type: DataTypes.STRING(20),
-      allowNull: true,
-    },
-    lien_parente: {
-      type: DataTypes.STRING(50),
-      allowNull: true,
-    },
-    notes: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-    },
-    // commentaires: {
-    //   type: DataTypes.TEXT,
-    //   allowNull: true,
-    // },
-    statut: {
-      type: DataTypes.ENUM('actif', 'inactif', 'décédé'),
-      defaultValue: 'actif',
-      allowNull: false
+      allowNull: false,
+      comment: 'Nom de la compagnie d\'assurance du patient'
     },
     mot_de_passe: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      validate: {
-        notEmpty: true,
-        len: [8, 255]
-      }
+      comment: 'Mot de passe hashé du patient pour l\'authentification'
     },
-    // La relation avec Utilisateur est gérée via createdBy et updatedBy
+    // Direct relationships from UML diagram
+    // seConnecter() method will be implemented as instance method
+    // creerCompte() method will be implemented as class method
+    // gererAccesDossier() method will be implemented as instance method
   }, {
     tableName: 'Patients',
     timestamps: true,
     paranoid: true, // Active la suppression douce (soft delete)
     defaultScope: {
-      attributes: { exclude: ['numero_securite_sociale', 'numero_assurance'] }
+      attributes: { exclude: ['mot_de_passe'] }
     },
     scopes: {
       withSensitiveData: {
         attributes: { include: ['numero_securite_sociale', 'numero_assurance'] }
+      },
+      withPassword: {
+        attributes: {}
       },
       actifs: {
         where: { statut: 'actif' }
@@ -271,7 +184,6 @@ module.exports = (sequelize) => {
       raw: true
     });
     
-    // if (dossiers.length === 0) return [];
     if (dossiers.length === 0) {
       return [];
     }
@@ -301,6 +213,87 @@ module.exports = (sequelize) => {
       ],
       order: [['date_prelevement', 'DESC']],
       ...options
+    });
+  };
+
+  // UML Diagram Methods Implementation
+  
+  // seConnecter() method from UML diagram
+  Patient.prototype.seConnecter = async function(motDePasse) {
+    const bcrypt = require('bcryptjs');
+    const isValid = await bcrypt.compare(motDePasse, this.mot_de_passe);
+    
+    if (isValid) {
+      // Update derniere_connexion if field exists
+      if (this.date_derniere_connexion !== undefined) {
+        this.date_derniere_connexion = new Date();
+        await this.save();
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // creerCompte() class method from UML diagram
+  Patient.creerCompte = async function(patientData) {
+    const bcrypt = require('bcryptjs');
+    
+    // Generate unique numero_dossier if not provided
+    if (!patientData.numero_dossier) {
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+      patientData.numero_dossier = `PAT-${timestamp}-${random}`;
+    }
+    
+    // Hash password if provided
+    if (patientData.mot_de_passe) {
+      const salt = await bcrypt.genSalt(10);
+      patientData.mot_de_passe = await bcrypt.hash(patientData.mot_de_passe, salt);
+    }
+    
+    return await this.create(patientData);
+  };
+
+  // gererAccesDossier() method from UML diagram
+  Patient.prototype.gererAccesDossier = async function(professionnelId, typeAcces = 'lecture') {
+    const { AutorisationAcces, ProfessionnelSante } = this.sequelize.models;
+    
+    // Verify professional exists
+    const professionnel = await ProfessionnelSante.findByPk(professionnelId);
+    if (!professionnel) {
+      throw new Error('Professionnel de santé non trouvé');
+    }
+    
+    // Create access authorization
+    const autorisation = await AutorisationAcces.create({
+      patient_id: this.id_patient,
+      professionnel_id: professionnelId,
+      typeAcces: typeAcces,
+      dateDebut: new Date(),
+      statut: 'Actif',
+      raison: `Autorisation d'accès ${typeAcces} accordée par le patient`
+    });
+    
+    return autorisation;
+  };
+
+  // consulterDossier() method from UML diagram
+  Patient.prototype.consulterDossier = async function() {
+    const { DossierMedical } = this.sequelize.models;
+    
+    return await DossierMedical.findAll({
+      where: { patient_id: this.id_patient },
+      include: [
+        {
+          model: this.sequelize.models.ProfessionnelSante,
+          as: 'medecinReferent'
+        },
+        {
+          model: this.sequelize.models.ServiceSante,
+          as: 'serviceResponsable'
+        }
+      ],
+      order: [['dateCreation', 'DESC']]
     });
   };
 

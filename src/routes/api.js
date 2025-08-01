@@ -10,6 +10,7 @@ const serviceSanteRoutes = require('../modules/serviceSante/serviceSante.route')
 const rendezVousRoutes = require('../modules/rendezVous/rendezVous.route');
 const prescriptionRoutes = require('../modules/prescription/prescription.route');
 const examenLaboRoutes = require('../modules/examenLabo/examenLabo.route');
+const accessRoutes = require('../modules/access/access.route');
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.use('/professionnelSante', professionnelSanteRoutes);
 router.use('/hopital', hopitalRoutes);
 router.use('/service-sante', serviceSanteRoutes);
 // router.use('/authcontroller', authController);
+router.use('/access', accessRoutes);
 
 router.use('/dossierMedical', dossierMedicalRoutes);
 router.use('/consultation', consultationRoutes);

@@ -83,5 +83,68 @@ module.exports = (sequelize) => {
     paranoid: true, // Active la suppression douce
   });
 
+  // UML Diagram Methods Implementation
+  
+  // valider() method from UML diagram
+  Consultation.prototype.valider = async function(validateurId) {
+    this.statut = 'terminee';
+    this.updatedBy = validateurId;
+    await this.save();
+    return this;
+  };
+  
+  // modifier() method from UML diagram
+  Consultation.prototype.modifier = async function(donnees, modifiateurId) {
+    Object.keys(donnees).forEach(key => {
+      if (this.hasOwnProperty(key) && key !== 'id_consultation') {
+        this[key] = donnees[key];
+      }
+    });
+    
+    this.updatedBy = modifiateurId;
+    await this.save();
+    return this;
+  };
+  
+  // annuler() method from UML diagram
+  Consultation.prototype.annuler = async function(motif, annulateurId) {
+    this.statut = 'annulee';
+    this.date_annulation = new Date();
+    this.motif_annulation = motif;
+    this.updatedBy = annulateurId;
+    await this.save();
+    return this;
+  };
+  
+  // planifier() method from UML diagram
+  Consultation.prototype.planifier = async function(dateConsultation, planificateurId) {
+    this.date_consultation = dateConsultation;
+    this.statut = 'planifiee';
+    this.updatedBy = planificateurId;
+    await this.save();
+    return this;
+  };
+  
+  // Class method to create consultation
+  Consultation.creerConsultation = async function(consultationData) {
+    const consultation = await this.create({
+      date_consultation: consultationData.date_consultation,
+      motif: consultationData.motif,
+      diagnostic: consultationData.diagnostic || null,
+      compte_rendu: consultationData.compte_rendu || null,
+      examen_clinique: consultationData.examen_clinique || null,
+      statut: consultationData.statut || 'planifiee',
+      duree: consultationData.duree || 30,
+      type_consultation: consultationData.type_consultation || 'premiere',
+      confidentialite: consultationData.confidentialite || 'normal',
+      dossier_id: consultationData.dossier_id,
+      professionnel_id: consultationData.professionnel_id,
+      service_id: consultationData.service_id,
+      createdBy: consultationData.createdBy
+    });
+    
+    return consultation;
+  };
+
   return Consultation;
 };

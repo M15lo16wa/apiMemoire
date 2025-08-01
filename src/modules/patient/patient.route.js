@@ -33,7 +33,7 @@ const router = express.Router();
  *       403:
  *         description: Accès refusé
  *   post:
- *     summary: Création d'un patient (par un médecin ou auto-inscription)
+ *     summary: Création d'un patient
  *     tags: [Patient]
  *     security:
  *       - bearerAuth: []
@@ -47,84 +47,72 @@ const router = express.Router();
  *               - nom
  *               - prenom
  *               - date_naissance
- *               - lieu_naissance
- *               - civilite
  *               - sexe
- *               - numero_assure
- *               - nom_assurance
- *               - adresse
- *               - ville
- *               - pays
  *               - email
  *               - telephone
+ *               - numero_assure
+ *               - nom_assurance
  *               - mot_de_passe
  *             properties:
  *               nom:
  *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 100
  *                 example: "Dupont"
+ *                 description: "Nom de famille du patient (obligatoire)"
  *               prenom:
  *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 100
  *                 example: "Jean"
+ *                 description: "Prénom du patient (obligatoire)"
  *               date_naissance:
  *                 type: string
  *                 format: date
  *                 example: "1988-05-15"
- *               lieu_naissance:
- *                 type: string
- *                 example: "Dakar"
- *               civilite:
- *                 type: string
- *                 enum: [M., Mme, Mlle]
- *                 example: "M."
+ *                 description: "Date de naissance du patient (obligatoire)"
  *               sexe:
  *                 type: string
- *                 enum: [M, F, Autre]
+ *                 enum: [M, F, X, I]
  *                 example: "M"
- *               numero_assure:
- *                 type: string
- *                 example: "SN123456789"
- *               nom_assurance:
- *                 type: string
- *                 example: "IPRES"
- *               adresse:
- *                 type: string
- *                 example: "123 Rue de la République"
- *               ville:
- *                 type: string
- *                 example: "Dakar"
- *               pays:
- *                 type: string
- *                 example: "Sénégal"
+ *                 description: "Sexe du patient (M: Masculin, F: Féminin, X: Non binaire, I: Intersexe)"
  *               email:
  *                 type: string
  *                 format: email
+ *                 maxLength: 100
  *                 example: "jean.dupont@email.com"
+ *                 description: "Adresse email du patient (unique, obligatoire)"
  *               telephone:
  *                 type: string
+ *                 maxLength: 20
  *                 example: "+221701234567"
+ *                 description: "Numéro de téléphone du patient (obligatoire)"
+ *               adresse:
+ *                 type: string
+ *                 maxLength: 255
+ *                 example: "123 Rue de la République"
+ *                 description: "Adresse postale du patient (optionnel)"
+ *               identifiantNational:
+ *                 type: string
+ *                 maxLength: 50
+ *                 example: "1234567890123"
+ *                 description: "Identifiant national du patient (numéro sécurité sociale, etc.) (optionnel)"
+ *               numero_assure:
+ *                 type: string
+ *                 maxLength: 50
+ *                 example: "IPRES123456789"
+ *                 description: "Numéro d'assuré pour l'authentification (obligatoire, unique)"
+ *               nom_assurance:
+ *                 type: string
+ *                 maxLength: 100
+ *                 example: "IPRES"
+ *                 description: "Nom de la compagnie d'assurance (obligatoire)"
  *               mot_de_passe:
  *                 type: string
  *                 format: password
+ *                 minLength: 8
  *                 example: "motdepasse123"
- *               code_postal:
- *                 type: string
- *                 example: "10000"
- *               groupe_sanguin:
- *                 type: string
- *                 enum: [A+, A-, B+, B-, AB+, AB-, O+, O-, Inconnu]
- *                 example: "A+"
- *               personne_contact:
- *                 type: string
- *                 example: "Marie Dupont"
- *               telephone_urgence:
- *                 type: string
- *                 example: "+221701234568"
- *               lien_parente:
- *                 type: string
- *                 example: "Épouse"
- *               profession:
- *                 type: string
- *                 example: "Ingénieur"
+ *                 description: "Mot de passe du patient pour l'authentification (obligatoire)"
  *              
  *     responses:
  *       201:
@@ -197,16 +185,34 @@ router
  *             properties:
  *               nom:
  *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 100
+ *                 description: "Nom de famille du patient"
  *               prenom:
  *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 100
+ *                 description: "Prénom du patient"
  *               email:
  *                 type: string
+ *                 format: email
+ *                 maxLength: 100
+ *                 description: "Adresse email du patient (unique)"
  *               telephone:
  *                 type: string
+ *                 maxLength: 20
+ *                 description: "Numéro de téléphone du patient"
  *               adresse:
  *                 type: string
- *               ville:
+ *                 maxLength: 255
+ *                 description: "Adresse postale du patient"
+ *               identifiantNational:
  *                 type: string
+ *                 maxLength: 50
+ *                 description: "Identifiant national du patient"
+ *               utilisateur_id:
+ *                 type: integer
+ *                 description: "ID du compte utilisateur lié au patient"
  *     responses:
  *       200:
  *         description: Patient mis à jour
@@ -275,13 +281,29 @@ router
  *             properties:
  *               numero_assure:
  *                 type: string
- *                 example: "SN123456789"
+ *                 example: "IPRES123456789"
+ *                 description: "Numéro d'assuré du patient"
  *               mot_de_passe:
  *                 type: string
+ *                 format: password
  *                 example: "motdepasse123"
+ *                 description: "Mot de passe du patient"
  *     responses:
  *       200:
  *         description: Connexion réussie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 token:
+ *                   type: string
+ *                   description: JWT token pour l'authentification
+ *                 patient:
+ *                   $ref: '#/components/schemas/Patient'
  *       401:
  *         description: Numéro d'assuré ou mot de passe incorrect
  */

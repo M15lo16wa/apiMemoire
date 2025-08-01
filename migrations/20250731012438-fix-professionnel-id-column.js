@@ -15,7 +15,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true,
         references: {
-          model: 'ProfessionnelSantes', // Make sure this matches your actual table name
+          model: 'ProfessionnelsSante', // Make sure this matches your actual table name
           key: 'id_professionnel'
         },
         onUpdate: 'CASCADE',

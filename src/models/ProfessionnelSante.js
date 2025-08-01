@@ -263,5 +263,137 @@ module.exports = (sequelize) => {
     });
   };
 
+  // UML Diagram Methods Implementation
+  
+  // prescrirSoins() method from UML diagram
+  ProfessionnelSante.prototype.prescrirSoins = async function(patientId, soinsData) {
+    const { Prescription, DossierMedical } = this.sequelize.models;
+    
+    // Get patient's active medical record
+    const dossier = await DossierMedical.findOne({
+      where: { 
+        patient_id: patientId, 
+        statut: 'actif' 
+      },
+      order: [['dateCreation', 'DESC']]
+    });
+    
+    if (!dossier) {
+      throw new Error('Aucun dossier médical actif trouvé pour ce patient');
+    }
+    
+    // Create prescription
+    const prescription = await Prescription.create({
+      dossier_id: dossier.id_dossier,
+      professionnel_id: this.id_professionnel,
+      medicament: soinsData.medicament || soinsData.traitement,
+      dosage: soinsData.dosage,
+      frequence: soinsData.frequence,
+      duree: soinsData.duree,
+      instructions: soinsData.instructions,
+      prescrit_traitement: true,
+      statut: 'active',
+      renouvelable: soinsData.renouvelable || false,
+      nb_renouvellements: soinsData.nb_renouvellements || 0
+    });
+    
+    return prescription;
+  };
+
+  // effectuerObservation() method from UML diagram
+  ProfessionnelSante.prototype.effectuerObservation = async function(patientId, observationData) {
+    const { Consultation, DossierMedical } = this.sequelize.models;
+    
+    // Get patient's active medical record
+    const dossier = await DossierMedical.findOne({
+      where: { 
+        patient_id: patientId, 
+        statut: 'actif' 
+      },
+      order: [['dateCreation', 'DESC']]
+    });
+    
+    if (!dossier) {
+      throw new Error('Aucun dossier médical actif trouvé pour ce patient');
+    }
+    
+    // Create consultation record
+    const consultation = await Consultation.create({
+      dossier_id: dossier.id_dossier,
+      professionnel_id: this.id_professionnel,
+      date_consultation: observationData.date_consultation || new Date(),
+      motif_consultation: observationData.motif_consultation,
+      diagnostic: observationData.diagnostic,
+      observations: observationData.observations,
+      traitement_prescrit: observationData.traitement_prescrit,
+      statut: 'terminee'
+    });
+    
+    return consultation;
+  };
+
+  // gererAccess() method from UML diagram
+  ProfessionnelSante.prototype.gererAccess = async function(patientId, typeAccess = 'lecture') {
+    const { AutorisationAcces, HistoriqueAccess } = this.sequelize.models;
+    
+    // Create access history record
+    const historique = await HistoriqueAccess.create({
+      professionnel_id: this.id_professionnel,
+      dateHeureAcces: new Date(),
+      action: 'demande_acces',
+      ressourceAccedee: 'DossierMedical',
+      idRessource: patientId,
+      details: `Demande d'accès ${typeAccess} au dossier du patient ${patientId}`
+    });
+    
+    // Create authorization request
+    const autorisation = await AutorisationAcces.create({
+      historique_id: historique.id_historique,
+      autorisateur_id: this.id_professionnel,
+      typeAcces: typeAccess,
+      dateDebut: new Date(),
+      statut: 'Actif',
+      raison: `Accès professionnel - ${this.role}`
+    });
+    
+    return { historique, autorisation };
+  };
+
+  // donnerAutorisation() method from UML diagram
+  ProfessionnelSante.prototype.donnerAutorisation = async function(demandeId, decision = 'Actif') {
+    const { AutorisationAcces } = this.sequelize.models;
+    
+    // Update authorization status
+    const autorisation = await AutorisationAcces.findByPk(demandeId);
+    if (!autorisation) {
+      throw new Error('Demande d\'autorisation non trouvée');
+    }
+    
+    autorisation.statut = decision;
+    autorisation.autorisateur_id = this.id_professionnel;
+    await autorisation.save();
+    
+    return autorisation;
+  };
+
+  // lier() method from UML diagram - Link with another professional
+  ProfessionnelSante.prototype.lier = async function(autreProfessionnelId, typeLien = 'collaboration') {
+    const { ProfessionnelSante } = this.sequelize.models;
+    
+    const autreProfessionnel = await ProfessionnelSante.findByPk(autreProfessionnelId);
+    if (!autreProfessionnel) {
+      throw new Error('Professionnel cible non trouvé');
+    }
+    
+    // This could be implemented with a separate table for professional relationships
+    // For now, we'll return a simple object indicating the link
+    return {
+      professionnel1: this.id_professionnel,
+      professionnel2: autreProfessionnelId,
+      typeLien: typeLien,
+      dateCreation: new Date()
+    };
+  };
+
   return ProfessionnelSante;
 };

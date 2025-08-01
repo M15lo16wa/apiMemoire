@@ -10,32 +10,81 @@ module.exports = (sequelize) => {
       autoIncrement: true,
       allowNull: false,
     },
-    dateHeureAcces: {
+    date_heure_acces: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
     action: { 
-      type: DataTypes.STRING(100),
+      type: DataTypes.STRING(50),
       allowNull: false,
     },
-    ressourceAccedee: { 
-      type: DataTypes.STRING(100),
-      allowNull: false,
+    type_ressource: { 
+      type: DataTypes.STRING(50),
+      allowNull: true,
     },
-    idRessource: { 
+    id_ressource: { 
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
     details: {
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    // Clé étrangère vers ProfessionnelSante sera définie dans src/models/index.js
-    // Clé étrangère vers AutorisationAcces (si c'est une relation one-to-one comme dans notre analyse)
+    statut: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'SUCCES',
+    },
+    code_erreur: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    message_erreur: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    adresse_ip: {
+      type: DataTypes.STRING(45),
+      allowNull: true,
+    },
+    user_agent: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    device_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+    // Foreign keys
+    professionnel_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    id_utilisateur: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    id_patient: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    id_dossier: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    id_service: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    createdBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   }, {
     tableName: 'HistoriquesAccess',
     timestamps: true,
+    paranoid: true,
   });
 
   return HistoriqueAccess;

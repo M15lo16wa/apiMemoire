@@ -32,8 +32,8 @@ exports.createPatient = async (patientData) => {
     throw new AppError("Le champ 'role' n'est pas autorisé lors de la création d'un patient.", 400);
   }
 
-  // Validation des champs requis selon le contrôleur
-  const requiredFields = ['nom', 'prenom', 'date_naissance', 'lieu_naissance', 'civilite', 'sexe', 'numero_assure', 'nom_assurance', 'adresse', 'ville', 'pays', 'email', 'telephone', 'mot_de_passe'];
+  // Validation des champs requis selon le schéma actuel de la base
+  const requiredFields = ['nom', 'prenom', 'date_naissance', 'sexe', 'email', 'telephone', 'numero_assure', 'nom_assurance', 'mot_de_passe'];
   const missingFields = requiredFields.filter(field => !patientData[field]);
 
   if (missingFields.length > 0) {
@@ -52,56 +52,43 @@ exports.createPatient = async (patientData) => {
 
   // Vérifier si un patient avec le même numéro d'assuré existe déjà
   if (patientData.numero_assure) {
-    const existingPatientByNumero = await Patient.findOne({
+    const existingPatientByNumeroAssure = await Patient.findOne({
       where: { numero_assure: patientData.numero_assure }
     });
-    if (existingPatientByNumero) {
+    if (existingPatientByNumeroAssure) {
       throw new AppError('Un patient avec ce numéro d\'assuré existe déjà.', 400);
     }
   }
 
-  // Hasher le mot de passe
-  const hashedPassword = await bcrypt.hash(patientData.mot_de_passe, 12);
+  // Vérifier si un patient avec le même identifiant national existe déjà (optionnel)
+  if (patientData.identifiantNational) {
+    const existingPatientByIdentifiant = await Patient.findOne({
+      where: { identifiantNational: patientData.identifiantNational }
+    });
+    if (existingPatientByIdentifiant) {
+      throw new AppError('Un patient avec cet identifiant national existe déjà.', 400);
+    }
+  }
 
-  // Générer un numéro de dossier unique
-  const numeroDossier = await generateNumeroDossier();
-
-  // Préparer les données patient avec tous les champs requis
+  // Préparer les données patient avec les champs actuels
   const completePatientData = {
-    numero_dossier: numeroDossier,
     nom: patientData.nom,
     prenom: patientData.prenom,
     date_naissance: patientData.date_naissance,
-    lieu_naissance: patientData.lieu_naissance,
-    civilite: patientData.civilite,
     sexe: patientData.sexe,
+    adresse: patientData.adresse || null,
+    telephone: patientData.telephone,
+    email: patientData.email,
+    identifiantNational: patientData.identifiantNational || null,
     numero_assure: patientData.numero_assure,
     nom_assurance: patientData.nom_assurance,
-    adresse: patientData.adresse,
-    ville: patientData.ville,
-    pays: patientData.pays,
-    email: patientData.email,
-    telephone: patientData.telephone,
-    mot_de_passe: hashedPassword,
-    statut: 'actif',
-    // Champs optionnels
-    code_postal: patientData.code_postal || null,
-    groupe_sanguin: patientData.groupe_sanguin || null,
-    personne_urgence_nom: patientData.personne_urgence_nom || null,
-    personne_urgence_telephone: patientData.personne_urgence_telephone || null,
-    personne_urgence_lien: patientData.personne_urgence_lien || null,
-    profession: patientData.profession || null,
-    situation_familiale: patientData.situation_familiale || null,
-    nombre_enfants: patientData.nombre_enfants || 0,
-    commentaires: patientData.commentaires || null
+    mot_de_passe: patientData.mot_de_passe || patientData.password // Support both field names
   };
 
   // Créer le patient
   const newPatient = await Patient.create(completePatientData);
   
-  // Retourner le patient sans le mot de passe
-  const { mot_de_passe, ...patientWithoutPassword } = newPatient.toJSON();
-  return patientWithoutPassword;
+  return newPatient;
 };
 
 exports.updatePatient = async (id, patientData) => {
@@ -111,7 +98,7 @@ exports.updatePatient = async (id, patientData) => {
   }
 
   // Empêcher la modification des champs sensibles
-  const forbiddenFields = ['mot_de_passe', 'role', 'numero_assure', 'id_patient'];
+  const forbiddenFields = ['role', 'id_patient'];
   forbiddenFields.forEach(field => {
     if (patientData[field]) {
       delete patientData[field];

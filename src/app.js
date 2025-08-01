@@ -269,6 +269,7 @@ const swaggerDefinition = {
       },
       Patient: {
         type: 'object',
+        required: ['nom', 'prenom', 'date_naissance', 'sexe', 'email', 'telephone', 'numero_assure', 'nom_assurance', 'mot_de_passe'],
         properties: {
           id_patient: {
             type: 'integer',
@@ -276,109 +277,62 @@ const swaggerDefinition = {
           },
           nom: {
             type: 'string',
-            description: 'Nom de famille du patient'
+            minLength: 2,
+            maxLength: 100,
+            description: 'Nom de famille du patient (obligatoire)'
           },
           prenom: {
             type: 'string',
-            description: 'Prénom du patient'
-          },
-          email: {
-            type: 'string',
-            format: 'email',
-            description: 'Adresse email du patient'
+            minLength: 2,
+            maxLength: 100,
+            description: 'Prénom du patient (obligatoire)'
           },
           date_naissance: {
             type: 'string',
             format: 'date',
-            description: 'Date de naissance du patient'
-          },
-          age: {
-            type: 'integer',
-            minimum: 0,
-            maximum: 150,
-            description: 'Âge du patient'
+            description: 'Date de naissance du patient (obligatoire)'
           },
           sexe: {
             type: 'string',
-            enum: ['M', 'F', 'Autre', 'Non précisé'],
-            description: 'Sexe du patient'
+            enum: ['M', 'F', 'X', 'I'],
+            description: 'Sexe du patient (M: Masculin, F: Féminin, X: Non binaire, I: Intersexe)'
           },
           telephone: {
             type: 'string',
+            maxLength: 20,
             description: 'Numéro de téléphone du patient'
+          },
+          email: {
+            type: 'string',
+            format: 'email',
+            maxLength: 100,
+            description: 'Adresse email du patient (unique)'
           },
           adresse: {
             type: 'string',
-            description: 'Adresse du patient'
+            maxLength: 255,
+            description: 'Adresse postale du patient'
           },
-          code_postal: {
+          identifiantNational: {
             type: 'string',
-            description: 'Code postal'
+            maxLength: 50,
+            description: 'Identifiant national du patient (numéro sécurité sociale, etc.) - optionnel'
           },
-          ville: {
+          numero_assure: {
             type: 'string',
-            description: 'Ville de résidence'
+            maxLength: 50,
+            description: 'Numéro d\'assuré pour l\'authentification du patient (obligatoire, unique)'
           },
-          pays: {
+          nom_assurance: {
             type: 'string',
-            description: 'Pays de résidence'
+            maxLength: 100,
+            description: 'Nom de la compagnie d\'assurance du patient (obligatoire)'
           },
-          lieu_naissance: {
+          mot_de_passe: {
             type: 'string',
-            description: 'Lieu de naissance'
-          },
-          groupe_sanguin: {
-            type: 'string',
-            enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Inconnu'],
-            description: 'Groupe sanguin du patient'
-          },
-          assurance_maladie: {
-            type: 'string',
-            description: 'Assurance maladie'
-          },
-          numero_assurance: {
-            type: 'string',
-            description: 'Numéro d\'assurance'
-          },
-          personne_urgence_nom: {
-            type: 'string',
-            description: 'Nom de la personne à contacter en cas d\'urgence'
-          },
-          personne_urgence_telephone: {
-            type: 'string',
-            description: 'Téléphone de la personne à contacter en cas d\'urgence'
-          },
-          personne_urgence_lien: {
-            type: 'string',
-            description: 'Lien avec la personne à contacter en cas d\'urgence'
-          },
-          profession: {
-            type: 'string',
-            description: 'Profession du patient'
-          },
-          situation_familiale: {
-            type: 'string',
-            enum: ['Célibataire', 'Marié(e)', 'Pacsé(e)', 'Divorcé(e)', 'Veuf/Veuve', 'Union libre', 'Autre'],
-            description: 'Situation familiale'
-          },
-          nombre_enfants: {
-            type: 'integer',
-            minimum: 0,
-            description: 'Nombre d\'enfants'
-          },
-          commentaires: {
-            type: 'string',
-            description: 'Commentaires additionnels'
-          },
-          statut: {
-            type: 'string',
-            enum: ['actif', 'inactif', 'décédé'],
-            description: 'Statut médical du patient'
-          },
-          date_derniere_connexion: {
-            type: 'string',
-            format: 'date-time',
-            description: 'Date de dernière connexion'
+            format: 'password',
+            minLength: 8,
+            description: 'Mot de passe du patient pour l\'authentification (haché dans la base de données)'
           },
           createdAt: {
             type: 'string',
@@ -394,6 +348,7 @@ const swaggerDefinition = {
       },
       DossierMedical: {
         type: 'object',
+        required: ['patient_id'],
         properties: {
           id_dossier: {
             type: 'integer',
@@ -401,7 +356,8 @@ const swaggerDefinition = {
           },
           numeroDossier: {
             type: 'string',
-            description: 'Numéro unique du dossier'
+            maxLength: 50,
+            description: 'Numéro unique du dossier (généré automatiquement)'
           },
           dateCreation: {
             type: 'string',
@@ -410,17 +366,19 @@ const swaggerDefinition = {
           },
           statut: {
             type: 'string',
-            enum: ['Ouvert', 'Fermé', 'Archivé'],
+            enum: ['actif', 'ferme', 'archive', 'fusionne'],
+            default: 'actif',
             description: 'Statut actuel du dossier médical'
           },
           type_dossier: {
             type: 'string',
             enum: ['principal', 'specialite', 'urgence', 'suivi', 'consultation', 'autre'],
+            default: 'principal',
             description: 'Type de dossier médical'
           },
           patient_id: {
             type: 'integer',
-            description: 'ID du patient propriétaire du dossier'
+            description: 'ID du patient propriétaire du dossier (obligatoire)'
           },
           service_id: {
             type: 'integer',
@@ -436,23 +394,23 @@ const swaggerDefinition = {
           },
           antecedent_medicaux: {
             type: 'object',
-            description: 'Antécédents médicaux structurés'
+            description: 'Antécédents médicaux structurés (JSON)'
           },
           allergies: {
             type: 'object',
-            description: 'Allergies et intolérances'
+            description: 'Allergies et intolérances (JSON)'
           },
           traitements_chroniques: {
             type: 'object',
-            description: 'Traitements au long cours'
+            description: 'Traitements au long cours (JSON)'
           },
           parametres_vitaux: {
             type: 'object',
-            description: 'Derniers paramètres vitaux'
+            description: 'Derniers paramètres vitaux (JSON)'
           },
           habitudes_vie: {
             type: 'object',
-            description: 'Informations sur le mode de vie'
+            description: 'Informations sur le mode de vie (JSON)'
           },
           historique_familial: {
             type: 'string',
@@ -481,6 +439,7 @@ const swaggerDefinition = {
           },
           motif_fermeture: {
             type: 'string',
+            maxLength: 255,
             description: 'Raison de la fermeture du dossier'
           },
           createdAt: {
@@ -642,6 +601,10 @@ const swaggerDefinition = {
             enum: ['Planifié', 'Confirmé', 'En cours', 'Terminé', 'Annulé', 'Rappel'],
             description: 'Statut du rendez-vous'
           },
+          service_id: {
+            type: 'integer',
+            description: 'ID du service de santé associé au rendez-vous'
+          },
           type_rappel: {
             type: 'string',
             enum: ['general', 'medicament', 'examen', 'consultation'],
@@ -668,6 +631,7 @@ const swaggerDefinition = {
           hopital_id: { type: 'integer', description: "Identifiant de l'hôpital auquel appartient le service" },
           description: { type: 'string', description: 'Description du service', nullable: true },
           telephone: { type: 'string', description: 'Numéro de téléphone du service', nullable: true },
+          mutualisation_option: { type: 'boolean', description: 'Option de mutualisation entre professionnels de santé' },
           createdAt: { type: 'string', format: 'date-time', description: 'Date de création' },
           updatedAt: { type: 'string', format: 'date-time', description: 'Date de dernière mise à jour' }
         }
@@ -712,6 +676,10 @@ const swaggerDefinition = {
             type: 'string',
             enum: ['planifiee', 'en_cours', 'terminee', 'annulee'],
             description: 'Statut de la consultation'
+          },
+          consentement_acces: {
+            type: 'boolean',
+            description: 'Consentement pour l\'accès partagé avec d\'autres professionnels de santé'
           },
           createdAt: {
             type: 'string',

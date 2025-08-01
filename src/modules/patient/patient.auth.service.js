@@ -60,8 +60,8 @@ exports.loginPatient = async (numero_assure, mot_de_passe) => {
   }
 
   try {
-    // Find patient by numero_assure
-    const patient = await Patient.findOne({
+    // Find patient by numero_assure with password field included
+    const patient = await Patient.scope('withPassword').findOne({
       where: { numero_assure }
     });
 
@@ -71,28 +71,17 @@ exports.loginPatient = async (numero_assure, mot_de_passe) => {
       throw new AppError('Numéro d\'assuré ou mot de passe incorrect', 401);
     }
 
-    console.log('Password from DB (first 20 chars):', patient.mot_de_passe ? patient.mot_de_passe.substring(0, 20) + '...' : 'null');
+    // Check if password exists in database
+    if (!patient.mot_de_passe) {
+      throw new AppError('Mot de passe non défini pour ce patient', 500);
+    }
 
     // Check if password is correct
-    console.log('Attempting to compare passwords:');
-    console.log('- Input password:', mot_de_passe);
-    console.log('- Stored password hash:', patient.mot_de_passe);
-    
-    // Try direct string comparison first (for debugging)
-    console.log('- Direct string comparison:', mot_de_passe === patient.mot_de_passe);
-    
-    // Now try bcrypt comparison
     const isPasswordCorrect = await bcrypt.compare(mot_de_passe, patient.mot_de_passe);
-    console.log('- Bcrypt comparison result:', isPasswordCorrect);
     
-    // TEMPORARY FIX: Bypass password check for testing
-    console.log('IMPORTANT: Password check bypassed for testing!');
-    // const isPasswordCorrect = true;
-    
-    // Original code (commented out)
-    // if (!isPasswordCorrect) {
-    //   throw new AppError('Numéro d\'assuré ou mot de passe incorrect', 401);
-    // }
+    if (!isPasswordCorrect) {
+      throw new AppError('Numéro d\'assuré ou mot de passe incorrect', 401);
+    }
 
     // Update last login date
     await patient.update({ derniere_connexion: new Date() });
@@ -115,7 +104,7 @@ exports.changePatientPassword = async (patientId, currentPassword, newPassword) 
     throw new AppError('Vous devez être connecté pour changer votre mot de passe', 401);
   }
 
-  const patient = await Patient.findByPk(patientId);
+  const patient = await Patient.scope('withPassword').findByPk(patientId);
   
   if (!patient) {
     throw new AppError('Patient non trouvé', 404);
