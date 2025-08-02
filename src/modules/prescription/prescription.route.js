@@ -921,4 +921,332 @@ router.post('/validate/signature',
   PrescriptionController.validateSignature
 );
 
+/**
+ * @swagger
+ * /prescription/ordonnances-recentes:
+ *   get:
+ *     summary: Récupérer les ordonnances récemment créées par le professionnel
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Numéro de page
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 50
+ *           default: 10
+ *         description: Nombre d'éléments par page
+ *       - in: query
+ *         name: jours
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 30
+ *           default: 7
+ *         description: Nombre de jours à considérer
+ *     responses:
+ *       200:
+ *         description: Ordonnances récentes récupérées
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     ordonnances:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/PrescriptionModerne'
+ *                     pagination:
+ *                       type: object
+ *                     periode:
+ *                       type: object
+ */
+router.get('/ordonnances-recentes', 
+  authenticateToken, 
+  PrescriptionController.getOrdonnancesRecentes
+);
+
+/**
+ * @swagger
+ * /prescription/{prescription_id}/ajouter-dossier:
+ *   post:
+ *     summary: Ajouter une prescription au dossier médical du patient
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: prescription_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID de la prescription
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - dossier_id
+ *             properties:
+ *               dossier_id:
+ *                 type: integer
+ *                 minimum: 1
+ *                 description: ID du dossier médical
+ *     responses:
+ *       200:
+ *         description: Prescription ajoutée au dossier
+ *       400:
+ *         description: Données invalides
+ *       404:
+ *         description: Prescription ou dossier non trouvé
+ */
+router.post('/:prescription_id/ajouter-dossier',
+  authenticateToken,
+  paramValidationRules,
+  handleValidationErrors,
+  PrescriptionController.ajouterAuDossierPatient
+);
+
+/**
+ * @swagger
+ * /prescription/{prescription_id}/notification:
+ *   post:
+ *     summary: Créer une notification pour le patient
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: prescription_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID de la prescription
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [nouvelle_prescription, renouvellement, suspension, modification]
+ *                 default: nouvelle_prescription
+ *                 description: Type de notification
+ *               priorite:
+ *                 type: string
+ *                 enum: [basse, normale, haute, urgente]
+ *                 default: normale
+ *                 description: Priorité de la notification
+ *               canal:
+ *                 type: string
+ *                 enum: [application, email, sms, push]
+ *                 default: application
+ *                 description: Canal de notification
+ *     responses:
+ *       201:
+ *         description: Notification créée avec succès
+ */
+router.post('/:prescription_id/notification',
+  authenticateToken,
+  paramValidationRules,
+  handleValidationErrors,
+  PrescriptionController.creerNotification
+);
+
+/**
+ * @swagger
+ * /prescription/notification/{notification_id}/lue:
+ *   patch:
+ *     summary: Marquer une notification comme lue
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: notification_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID de la notification
+ *     responses:
+ *       200:
+ *         description: Notification marquée comme lue
+ */
+router.patch('/notification/:notification_id/lue',
+  authenticateToken,
+  PrescriptionController.marquerNotificationLue
+);
+
+/**
+ * @swagger
+ * /prescription/patient/{patient_id}/notifications:
+ *   get:
+ *     summary: Récupérer les notifications d'un patient
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patient_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID du patient
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 50
+ *           default: 10
+ *       - in: query
+ *         name: statut
+ *         schema:
+ *           type: string
+ *           enum: [non_lue, lue, toutes]
+ *           default: toutes
+ *         description: Filtrer par statut
+ *     responses:
+ *       200:
+ *         description: Notifications récupérées
+ */
+router.get('/patient/:patient_id/notifications',
+  authenticateToken,
+  paramValidationRules,
+  handleValidationErrors,
+  PrescriptionController.getNotificationsPatient
+);
+
+/**
+ * @swagger
+ * /prescription/ordonnance-complete:
+ *   post:
+ *     summary: Créer une ordonnance complète avec notification et ajout au dossier
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             allOf:
+ *               - $ref: '#/components/schemas/OrdonnanceRequest'
+ *               - type: object
+ *                 properties:
+ *                   dossier_id:
+ *                     type: integer
+ *                     minimum: 1
+ *                     description: ID du dossier médical (optionnel)
+ *                   priorite:
+ *                     type: string
+ *                     enum: [basse, normale, haute, urgente]
+ *                     default: normale
+ *                     description: Priorité de la notification
+ *                   canal:
+ *                     type: string
+ *                     enum: [application, email, sms, push]
+ *                     default: application
+ *                     description: Canal de notification
+ *     responses:
+ *       201:
+ *         description: Ordonnance créée avec notification
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     ordonnance:
+ *                       $ref: '#/components/schemas/PrescriptionModerne'
+ *                     notification:
+ *                       type: object
+ *                     numero:
+ *                       type: string
+ *                     qrCode:
+ *                       type: string
+ */
+router.post('/ordonnance-complete',
+  authenticateToken,
+  ordonnanceValidationRules,
+  handleValidationErrors,
+  PrescriptionController.createOrdonnanceComplete
+);
+
+/**
+ * @swagger
+ * /prescription/resume-aujourdhui:
+ *   get:
+ *     summary: Récupérer le résumé des ordonnances créées aujourd'hui
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Résumé des ordonnances d'aujourd'hui
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     total_aujourdhui:
+ *                       type: integer
+ *                     par_type:
+ *                       type: object
+ *                       properties:
+ *                         ordonnances:
+ *                           type: integer
+ *                         examens:
+ *                           type: integer
+ *                     derniere_ordonnance:
+ *                       $ref: '#/components/schemas/PrescriptionModerne'
+ *                     periode:
+ *                       type: object
+ */
+router.get('/resume-aujourdhui',
+  authenticateToken,
+  PrescriptionController.getResumeOrdonnancesAujourdhui
+);
+
 module.exports = router;

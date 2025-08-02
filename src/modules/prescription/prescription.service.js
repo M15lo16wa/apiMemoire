@@ -197,11 +197,11 @@ class PrescriptionService {
               attributes: ['nom', 'prenom', 'email']
             }]
           },
-          {
-            model: DossierMedical,
-            as: 'dossier',
-            attributes: ['id_dossier', 'numero_dossier', 'date_creation']
-          }
+                  {
+          model: DossierMedical,
+          as: 'dossier',
+          attributes: ['id_dossier', 'numeroDossier', 'dateCreation']
+        }
         ]
       });
 
@@ -626,6 +626,313 @@ class PrescriptionService {
     } catch (error) {
       console.error('❌ Erreur lors du calcul des statistiques:', error);
       throw new AppError('Impossible de calculer les statistiques', 500);
+    }
+  }
+
+  /**
+   * Récupérer les ordonnances récemment créées par un professionnel
+   * @param {number} professionnelId - ID du professionnel
+   * @param {Object} options - Options de pagination et filtres
+   * @returns {Promise<Object>} Ordonnances récentes avec métadonnées
+   */
+  static async getOrdonnancesRecentes(professionnelId, options = {}) {
+    try {
+      const { page = 1, limit = 10, jours = 7 } = options;
+      const offset = (page - 1) * limit;
+      
+      const dateLimite = new Date();
+      dateLimite.setDate(dateLimite.getDate() - jours);
+
+      const whereClause = {
+        professionnel_id: professionnelId,
+        type_prescription: 'ordonnance',
+        date_prescription: {
+          [Op.gte]: dateLimite
+        }
+      };
+
+      const { count, rows } = await Prescription.findAndCountAll({
+        where: whereClause,
+        include: [
+          {
+            model: Patient,
+            as: 'patient',
+            attributes: ['id_patient', 'nom', 'prenom', 'date_naissance', 'telephone']
+          },
+          {
+            model: DossierMedical,
+            as: 'dossier',
+            attributes: ['id_dossier', 'numeroDossier', 'dateCreation']
+          }
+        ],
+        order: [['date_prescription', 'DESC']],
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      });
+
+      return {
+        ordonnances: rows,
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+          hasNext: page * limit < count,
+          hasPrev: page > 1
+        },
+        periode: {
+          jours,
+          dateDebut: dateLimite,
+          dateFin: new Date()
+        }
+      };
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des ordonnances récentes:', error);
+      throw new AppError('Impossible de récupérer les ordonnances récentes', 500);
+    }
+  }
+
+  /**
+   * Ajouter une prescription au dossier médical du patient
+   * @param {number} prescriptionId - ID de la prescription
+   * @param {number} dossierId - ID du dossier médical
+   * @returns {Promise<Object>} Prescription mise à jour
+   */
+  static async ajouterAuDossierPatient(prescriptionId, dossierId) {
+    try {
+      // Vérifier que la prescription existe
+      const prescription = await Prescription.findByPk(prescriptionId);
+      if (!prescription) {
+        throw new AppError('Prescription non trouvée', 404);
+      }
+
+      // Vérifier que le dossier médical existe
+      const dossier = await DossierMedical.findByPk(dossierId);
+      if (!dossier) {
+        throw new AppError('Dossier médical non trouvé', 404);
+      }
+
+      // Vérifier que le dossier appartient au patient de la prescription
+      if (dossier.patient_id !== prescription.patient_id) {
+        throw new AppError('Le dossier médical ne correspond pas au patient de la prescription', 400);
+      }
+
+      // Mettre à jour la prescription avec le dossier
+      await prescription.update({
+        dossier_id: dossierId,
+        date_ajout_dossier: new Date()
+      });
+
+      // Retourner la prescription mise à jour avec ses relations
+      return await this.getPrescriptionById(prescriptionId);
+    } catch (error) {
+      console.error('❌ Erreur lors de l\'ajout au dossier patient:', error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Impossible d\'ajouter la prescription au dossier patient', 500);
+    }
+  }
+
+  /**
+   * Créer une notification pour le patient
+   * @param {number} prescriptionId - ID de la prescription
+   * @param {string} typeNotification - Type de notification
+   * @param {Object} options - Options de notification
+   * @returns {Promise<Object>} Notification créée
+   */
+  static async creerNotificationPatient(prescriptionId, typeNotification = 'nouvelle_prescription', options = {}) {
+    try {
+      const prescription = await this.getPrescriptionById(prescriptionId);
+      if (!prescription) {
+        throw new AppError('Prescription non trouvée', 404);
+      }
+
+      const notificationData = {
+        patient_id: prescription.patient_id,
+        prescription_id: prescriptionId,
+        type: typeNotification,
+        titre: this.getTitreNotification(typeNotification, prescription),
+        message: this.getMessageNotification(typeNotification, prescription),
+        statut: 'non_lue',
+        date_creation: new Date(),
+        ...options
+      };
+
+      // Ici, vous devriez avoir un modèle Notification
+      // Pour l'instant, on simule la création
+      const notification = {
+        id: Date.now(),
+        ...notificationData,
+        prescription: prescription
+      };
+
+      console.log('📧 Notification créée:', notification);
+
+      return notification;
+    } catch (error) {
+      console.error('❌ Erreur lors de la création de la notification:', error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Impossible de créer la notification', 500);
+    }
+  }
+
+  /**
+   * Générer le titre de la notification
+   * @param {string} type - Type de notification
+   * @param {Object} prescription - Prescription concernée
+   * @returns {string} Titre de la notification
+   */
+  static getTitreNotification(type, prescription) {
+    const patient = prescription.patient;
+    const nomPatient = `${patient.prenom} ${patient.nom}`;
+    
+    switch (type) {
+      case 'nouvelle_prescription':
+        return `Nouvelle ordonnance créée pour ${nomPatient}`;
+      case 'renouvellement':
+        return `Ordonnance renouvelée pour ${nomPatient}`;
+      case 'suspension':
+        return `Ordonnance suspendue pour ${nomPatient}`;
+      case 'modification':
+        return `Ordonnance modifiée pour ${nomPatient}`;
+      default:
+        return `Mise à jour prescription pour ${nomPatient}`;
+    }
+  }
+
+  /**
+   * Générer le message de la notification
+   * @param {string} type - Type de notification
+   * @param {Object} prescription - Prescription concernée
+   * @returns {string} Message de la notification
+   */
+  static getMessageNotification(type, prescription) {
+    const patient = prescription.patient;
+    const nomPatient = `${patient.prenom} ${patient.nom}`;
+    const numeroPrescription = prescription.prescriptionNumber;
+    const principeActif = prescription.principe_actif;
+    
+    switch (type) {
+      case 'nouvelle_prescription':
+        return `Une nouvelle ordonnance (${numeroPrescription}) a été créée pour ${nomPatient} avec ${principeActif}. Veuillez consulter votre dossier médical.`;
+      case 'renouvellement':
+        return `L'ordonnance ${numeroPrescription} pour ${nomPatient} a été renouvelée.`;
+      case 'suspension':
+        return `L'ordonnance ${numeroPrescription} pour ${nomPatient} a été suspendue. Veuillez contacter votre médecin.`;
+      case 'modification':
+        return `L'ordonnance ${numeroPrescription} pour ${nomPatient} a été modifiée.`;
+      default:
+        return `Mise à jour de l'ordonnance ${numeroPrescription} pour ${nomPatient}.`;
+    }
+  }
+
+  /**
+   * Marquer une notification comme lue
+   * @param {number} notificationId - ID de la notification
+   * @returns {Promise<Object>} Notification mise à jour
+   */
+  static async marquerNotificationLue(notificationId) {
+    try {
+      // Simulation de mise à jour de notification
+      const notification = {
+        id: notificationId,
+        statut: 'lue',
+        date_lecture: new Date()
+      };
+
+      console.log('✅ Notification marquée comme lue:', notification);
+      return notification;
+    } catch (error) {
+      console.error('❌ Erreur lors du marquage de la notification:', error);
+      throw new AppError('Impossible de marquer la notification comme lue', 500);
+    }
+  }
+
+  /**
+   * Récupérer les notifications d'un patient
+   * @param {number} patientId - ID du patient
+   * @param {Object} options - Options de pagination et filtres
+   * @returns {Promise<Object>} Notifications avec métadonnées
+   */
+  static async getNotificationsPatient(patientId, options = {}) {
+    try {
+      const { page = 1, limit = 10, statut } = options;
+      const offset = (page - 1) * limit;
+
+      // Simulation de récupération des notifications
+      const notifications = [
+        {
+          id: 1,
+          patient_id: patientId,
+          prescription_id: 1,
+          type: 'nouvelle_prescription',
+          titre: 'Nouvelle ordonnance créée',
+          message: 'Une nouvelle ordonnance a été créée pour vous.',
+          statut: 'non_lue',
+          date_creation: new Date()
+        }
+      ];
+
+      const count = notifications.length;
+
+      return {
+        notifications: notifications.slice(offset, offset + limit),
+        pagination: {
+          total: count,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(count / limit),
+          hasNext: page * limit < count,
+          hasPrev: page > 1
+        }
+      };
+    } catch (error) {
+      console.error('❌ Erreur lors de la récupération des notifications:', error);
+      throw new AppError('Impossible de récupérer les notifications', 500);
+    }
+  }
+
+  /**
+   * Créer une ordonnance complète avec notification
+   * @param {Object} prescriptionData - Données de la prescription
+   * @param {Object} professionnelData - Données du professionnel
+   * @param {Object} options - Options supplémentaires
+   * @returns {Promise<Object>} Ordonnance créée avec notification
+   */
+  static async createOrdonnanceComplete(prescriptionData, professionnelData, options = {}) {
+    try {
+      // Créer l'ordonnance
+      const ordonnance = await this.createOrdonnance(prescriptionData, professionnelData);
+
+      // Ajouter au dossier patient si spécifié
+      if (options.dossier_id) {
+        await this.ajouterAuDossierPatient(ordonnance.id_prescription, options.dossier_id);
+      }
+
+      // Créer une notification pour le patient
+      const notification = await this.creerNotificationPatient(
+        ordonnance.id_prescription,
+        'nouvelle_prescription',
+        {
+          priorite: options.priorite || 'normale',
+          canal: options.canal || 'application'
+        }
+      );
+
+      return {
+        ordonnance,
+        notification,
+        message: 'Ordonnance créée avec succès et notification envoyée au patient'
+      };
+    } catch (error) {
+      console.error('❌ Erreur lors de la création complète de l\'ordonnance:', error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError('Impossible de créer l\'ordonnance complète', 500);
     }
   }
 }

@@ -54,17 +54,29 @@ module.exports = {
           }
         }
       },
-      medicament: {
+      prescriptionNumber: {
+        type: DataTypes.STRING(50),
+        allowNull: true,
+        unique: true,
+        comment: 'Numéro unique de prescription généré automatiquement'
+      },
+      type_prescription: {
+        type: DataTypes.ENUM('ordonnance', 'examen'),
+        allowNull: false,
+        defaultValue: 'ordonnance',
+        comment: 'Type de prescription: ordonnance médicamenteuse ou demande d\'examen'
+      },
+      principe_actif: {
         type: DataTypes.STRING(255),
         allowNull: false,
-        comment: 'Dénomination commune internationale (DCI) du médicament',
+        comment: 'Principe actif (DCI) ou type d\'examen demandé',
         validate: {
           notEmpty: {
-            msg: 'Le nom du médicament est obligatoire'
+            msg: 'Le principe actif est obligatoire'
           },
           len: {
             args: [2, 255],
-            msg: 'Le nom du médicament doit contenir entre 2 et 255 caractères'
+            msg: 'Le principe actif doit contenir entre 2 et 255 caractères'
           }
         }
       },
@@ -151,7 +163,7 @@ module.exports = {
           }
         }
       },
-      duree: {
+      duree_traitement: {
         type: DataTypes.STRING(100),
         allowNull: true,
         comment: 'Durée du traitement (ex: 7 jours, 1 mois)'
@@ -161,7 +173,7 @@ module.exports = {
         allowNull: true,
         comment: 'Voie d\'administration du médicament'
       },
-      instructions: {
+      instructions_speciales: {
         type: DataTypes.TEXT,
         allowNull: true,
         comment: 'Instructions particulières (à jeun, pendant le repas, etc.)'
@@ -248,6 +260,21 @@ module.exports = {
         allowNull: true,
         comment: 'Raison de l\'arrêt prématuré du traitement'
       },
+      pharmacieDelivrance: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        comment: 'Pharmacie où les médicaments ont été délivrés'
+      },
+      signatureElectronique: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'Signature électronique du médecin prescripteur'
+      },
+      qrCode: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+        comment: 'QR Code pour vérification et traçabilité'
+      },
       patient_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -263,16 +290,7 @@ module.exports = {
         allowNull: true,
         comment: 'ID du dossier médical associé (géré dans index.js)'
       },
-      consultation_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: 'ID de la consultation ayant donné lieu à cette prescription (géré dans index.js)'
-      },
-      service_id: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        comment: 'ID du service prescripteur (géré dans index.js)'
-      },
+
       createdBy: {
         type: DataTypes.INTEGER,
         allowNull: true,
@@ -306,14 +324,14 @@ module.exports = {
     await queryInterface.addIndex('Prescriptions', ['patient_id']);
     await queryInterface.addIndex('Prescriptions', ['professionnel_id']);
     await queryInterface.addIndex('Prescriptions', ['dossier_id']);
-    await queryInterface.addIndex('Prescriptions', ['consultation_id']);
-    await queryInterface.addIndex('Prescriptions', ['service_id']);
     await queryInterface.addIndex('Prescriptions', ['statut']);
     await queryInterface.addIndex('Prescriptions', ['date_prescription']);
     await queryInterface.addIndex('Prescriptions', ['date_debut']);
     await queryInterface.addIndex('Prescriptions', ['date_fin']);
-    await queryInterface.addIndex('Prescriptions', ['medicament']);
+    await queryInterface.addIndex('Prescriptions', ['principe_actif']);
     await queryInterface.addIndex('Prescriptions', ['code_cip']);
+    await queryInterface.addIndex('Prescriptions', ['prescriptionNumber'], { unique: true });
+    await queryInterface.addIndex('Prescriptions', ['type_prescription', 'statut']);
   },
 
   async down (queryInterface, Sequelize) {

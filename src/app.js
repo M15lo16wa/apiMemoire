@@ -721,6 +721,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  *     description: Gestion des établissements hospitaliers
  *   - name: Patient
  *     description: Gestion des patients
+ *   - name: DMP - Patient
+ *     description: Dossier Médical Partagé - Fonctionnalités patient
  *   - name: Auth
  *     description: Authentification et autorisation
  *

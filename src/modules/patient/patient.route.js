@@ -2,6 +2,7 @@ const express = require('express');
 const patientController = require('./patient.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
 const patientAuth = require('../../middlewares/patientAuth');
+const dmpRoutes = require('./dmp.route');
 
 const router = express.Router();
 
@@ -368,5 +369,8 @@ router.get('/auth/me', patientAuth, patientController.getMe);
  *         description: Mot de passe actuel incorrect
  */
 router.post('/auth/change-password', patientAuth, patientController.changePassword);
+
+// Routes DMP (Dossier Médical Partagé)
+router.use('/dmp', dmpRoutes);
 
 module.exports = router;

@@ -424,6 +424,91 @@ const statsValidationRules = [
     })
 ];
 
+// Validation rules pour les ordonnances récentes
+const ordonnancesRecentesValidationRules = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Le numéro de page doit être un entier positif'),
+    
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('La limite doit être entre 1 et 50'),
+    
+  query('jours')
+    .optional()
+    .isInt({ min: 1, max: 30 })
+    .withMessage('Le nombre de jours doit être entre 1 et 30')
+];
+
+// Validation rules pour l'ajout au dossier patient
+const ajouterDossierValidationRules = [
+  body('dossier_id')
+    .notEmpty()
+    .withMessage('L\'ID du dossier médical est requis')
+    .isInt({ min: 1 })
+    .withMessage('L\'ID du dossier médical doit être un entier positif')
+];
+
+// Validation rules pour les notifications
+const notificationValidationRules = [
+  body('type')
+    .optional()
+    .isIn(['nouvelle_prescription', 'renouvellement', 'suspension', 'modification'])
+    .withMessage('Type de notification invalide'),
+    
+  body('priorite')
+    .optional()
+    .isIn(['basse', 'normale', 'haute', 'urgente'])
+    .withMessage('Priorité invalide'),
+    
+  body('canal')
+    .optional()
+    .isIn(['application', 'email', 'sms', 'push'])
+    .withMessage('Canal de notification invalide')
+];
+
+// Validation rules pour les notifications patient
+const notificationsPatientValidationRules = [
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Le numéro de page doit être un entier positif'),
+    
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('La limite doit être entre 1 et 50'),
+    
+  query('statut')
+    .optional()
+    .isIn(['non_lue', 'lue', 'toutes'])
+    .withMessage('Statut de notification invalide')
+];
+
+// Validation rules pour l'ordonnance complète
+const ordonnanceCompleteValidationRules = [
+  // Inclure toutes les règles d'ordonnance
+  ...ordonnanceValidationRules,
+  
+  // Ajouter les règles spécifiques
+  body('dossier_id')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('L\'ID du dossier médical doit être un entier positif'),
+    
+  body('priorite')
+    .optional()
+    .isIn(['basse', 'normale', 'haute', 'urgente'])
+    .withMessage('Priorité invalide'),
+    
+  body('canal')
+    .optional()
+    .isIn(['application', 'email', 'sms', 'push'])
+    .withMessage('Canal de notification invalide')
+];
+
 module.exports = {
   ordonnanceValidationRules,
   demandeExamenValidationRules,
@@ -433,5 +518,10 @@ module.exports = {
   renouvellementValidationRules,
   suspensionValidationRules,
   transfertValidationRules,
-  statsValidationRules
+  statsValidationRules,
+  ordonnancesRecentesValidationRules,
+  ajouterDossierValidationRules,
+  notificationValidationRules,
+  notificationsPatientValidationRules,
+  ordonnanceCompleteValidationRules
 };

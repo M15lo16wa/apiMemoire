@@ -537,31 +537,243 @@ class PrescriptionController {
    * Valider une signature électronique
    */
   static validateSignature = catchAsync(async (req, res, next) => {
-    const { signature } = req.body;
-    
-    if (!signature) {
-      return next(new AppError('Signature électronique manquante', 400));
-    }
-
-    const PrescriptionUtils = require('../../utils/prescriptionUtils');
-    const validatedSignature = PrescriptionUtils.validateElectronicSignature(signature);
-    
-    if (!validatedSignature) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Signature électronique invalide',
-        valid: false
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Signature électronique valide',
-      data: {
-        valid: true,
-        signature_data: validatedSignature
+    try {
+      const { signature } = req.body;
+      
+      if (!signature) {
+        return next(new AppError('Signature requise', 400));
       }
-    });
+
+      // Validation de la signature électronique
+      const isValid = PrescriptionUtils.validateElectronicSignature(signature);
+      
+      if (!isValid) {
+        return next(new AppError('Signature électronique invalide', 400));
+      }
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Signature électronique valide',
+        data: {
+          signature: signature,
+          valid: true,
+          timestamp: new Date()
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Récupérer les ordonnances récemment créées par le professionnel connecté
+   */
+  static getOrdonnancesRecentes = catchAsync(async (req, res, next) => {
+    try {
+      const professionnelId = req.user.id_professionnel || req.user.id;
+      const { page, limit, jours } = req.query;
+
+      const result = await PrescriptionService.getOrdonnancesRecentes(professionnelId, {
+        page: parseInt(page) || 1,
+        limit: parseInt(limit) || 10,
+        jours: parseInt(jours) || 7
+      });
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Ordonnances récentes récupérées avec succès',
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Ajouter une prescription au dossier médical du patient
+   */
+  static ajouterAuDossierPatient = catchAsync(async (req, res, next) => {
+    try {
+      const { prescription_id } = req.params;
+      const { dossier_id } = req.body;
+
+      if (!dossier_id) {
+        return next(new AppError('ID du dossier médical requis', 400));
+      }
+
+      const prescription = await PrescriptionService.ajouterAuDossierPatient(
+        parseInt(prescription_id),
+        parseInt(dossier_id)
+      );
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Prescription ajoutée au dossier patient avec succès',
+        data: {
+          prescription,
+          dossier_id: parseInt(dossier_id),
+          date_ajout: new Date()
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Créer une notification pour le patient
+   */
+  static creerNotification = catchAsync(async (req, res, next) => {
+    try {
+      const { prescription_id } = req.params;
+      const { type, priorite, canal } = req.body;
+
+      const notification = await PrescriptionService.creerNotificationPatient(
+        parseInt(prescription_id),
+        type || 'nouvelle_prescription',
+        {
+          priorite: priorite || 'normale',
+          canal: canal || 'application'
+        }
+      );
+
+      res.status(201).json({
+        status: 'success',
+        message: 'Notification créée avec succès',
+        data: {
+          notification,
+          prescription_id: parseInt(prescription_id)
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Marquer une notification comme lue
+   */
+  static marquerNotificationLue = catchAsync(async (req, res, next) => {
+    try {
+      const { notification_id } = req.params;
+
+      const notification = await PrescriptionService.marquerNotificationLue(
+        parseInt(notification_id)
+      );
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Notification marquée comme lue',
+        data: {
+          notification,
+          date_lecture: new Date()
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Récupérer les notifications d'un patient
+   */
+  static getNotificationsPatient = catchAsync(async (req, res, next) => {
+    try {
+      const { patient_id } = req.params;
+      const { page, limit, statut } = req.query;
+
+      const result = await PrescriptionService.getNotificationsPatient(
+        parseInt(patient_id),
+        {
+          page: parseInt(page) || 1,
+          limit: parseInt(limit) || 10,
+          statut
+        }
+      );
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Notifications récupérées avec succès',
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Créer une ordonnance complète avec notification et ajout au dossier
+   */
+  static createOrdonnanceComplete = catchAsync(async (req, res, next) => {
+    try {
+      const prescriptionData = req.body;
+      const professionnelData = {
+        id_professionnel: req.user.id_professionnel || req.user.id,
+        nom: req.user.nom,
+        prenom: req.user.prenom
+      };
+
+      const options = {
+        dossier_id: req.body.dossier_id,
+        priorite: req.body.priorite || 'normale',
+        canal: req.body.canal || 'application'
+      };
+
+      const result = await PrescriptionService.createOrdonnanceComplete(
+        prescriptionData,
+        professionnelData,
+        options
+      );
+
+      res.status(201).json({
+        status: 'success',
+        message: result.message,
+        data: {
+          ordonnance: result.ordonnance,
+          notification: result.notification,
+          numero: result.ordonnance.prescriptionNumber,
+          qrCode: result.ordonnance.qrCode,
+          date_creation: result.ordonnance.date_prescription
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
+   * Récupérer le résumé des ordonnances créées aujourd'hui
+   */
+  static getResumeOrdonnancesAujourdhui = catchAsync(async (req, res, next) => {
+    try {
+      const professionnelId = req.user.id_professionnel || req.user.id;
+      const aujourdhui = new Date();
+      aujourdhui.setHours(0, 0, 0, 0);
+
+      const result = await PrescriptionService.getOrdonnancesRecentes(professionnelId, {
+        page: 1,
+        limit: 50,
+        jours: 1
+      });
+
+      const resume = {
+        total_aujourdhui: result.pagination.total,
+        par_type: {
+          ordonnances: result.ordonnances.filter(o => o.type_prescription === 'ordonnance').length,
+          examens: result.ordonnances.filter(o => o.type_prescription === 'examen').length
+        },
+        derniere_ordonnance: result.ordonnances[0] || null,
+        periode: result.periode
+      };
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Résumé des ordonnances d\'aujourd\'hui',
+        data: resume
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 }
 

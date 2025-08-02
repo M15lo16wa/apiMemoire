@@ -282,7 +282,7 @@ module.exports = (sequelize) => {
       },
       
       afterUpdate: async (prescription, options) => {
-        console.log(`📝 Prescription mise à jour: ${prescription.prescriptionNumber}`);
+        console.log(` Prescription mise à jour: ${prescription.prescriptionNumber}`);
       }
     },
     
