@@ -107,7 +107,7 @@ async getDossierById(id_dossier, includes = []) {
         { 
             model: Patient, 
             as: 'patient',
-            attributes: ['id_patient', 'numero_dossier', 'nom', 'prenom', 'date_naissance', 'sexe', 'adresse', 'ville', 'code_postal', 'pays', 'telephone', 'email', 'groupe_sanguin']
+            attributes: ['id_patient', 'numero_dossier', 'nom', 'prenom', 'date_naissance', 'sexe', 'adresse', 'telephone', 'email']
         }
     ];
 

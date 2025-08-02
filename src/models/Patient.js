@@ -37,6 +37,12 @@ module.exports = (sequelize) => {
       allowNull: true,
       unique: true,
     },
+    numero_dossier: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      unique: true,
+      comment: 'Numéro unique du dossier patient. Format recommandé: [ETABLISSEMENT]-[ANNEE]-[NUMERO] (ex: HOP-2023-0001)'
+    },
     identifiantNational: {
       type: DataTypes.STRING(50),
       allowNull: true,

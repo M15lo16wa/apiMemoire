@@ -72,6 +72,10 @@ Consultation.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'service' }
 ProfessionnelSante.hasMany(Prescription, { foreignKey: 'professionnel_id', as: 'prescriptionsRedigees', onDelete: 'SET NULL' });
 Prescription.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'redacteur' });
 
+// 8.1. Patient et Prescription (One-to-Many) - Relation directe patient-prescription
+Patient.hasMany(Prescription, { foreignKey: 'patient_id', as: 'prescriptions', onDelete: 'CASCADE' });
+Prescription.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
+
 // 9. ProfessionnelSante et RendezVous (One-to-Many)
 ProfessionnelSante.hasMany(RendezVous, { foreignKey: 'id_professionnel', as: 'rendezVousAffectes', onDelete: 'SET NULL' });
 RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'id_professionnel', as: 'affecteA' });

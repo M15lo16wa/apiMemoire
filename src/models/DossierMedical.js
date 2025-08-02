@@ -69,10 +69,30 @@ module.exports = (sequelize) => {
       allowNull: true,
       comment: 'Traitements au long cours avec posologie et indications'
     },
-    parametres_vitaux: {
-      type: DataTypes.JSON,
+    heart_rate: {
+      type: DataTypes.INTEGER,
       allowNull: true,
-      comment: 'Derniers paramètres vitaux enregistrés (TA, poids, taille, IMC, etc.)'
+      comment: 'Fréquence cardiaque (battements par minute)'
+    },
+    blood_pressure: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      comment: 'Tension artérielle (format: systolique/diastolique, ex: 120/80)'
+    },
+    temperature: {
+      type: DataTypes.DECIMAL(4, 2),
+      allowNull: true,
+      comment: 'Température corporelle (en degrés Celsius)'
+    },
+    respiratory_rate: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'Fréquence respiratoire (respirations par minute)'
+    },
+    oxygen_saturation: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true,
+      comment: 'Saturation en oxygène (pourcentage)'
     },
     habitudes_vie: {
       type: DataTypes.JSON,
@@ -83,6 +103,14 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: true,
       comment: 'Antécédents familiaux notables'
+    },
+    groupe_sanguin: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      validate: {
+        isIn: [['A_POSITIF', 'A_NEGATIF', 'B_POSITIF', 'B_NEGATIF', 'AB_POSITIF', 'AB_NEGATIF', 'O_POSITIF', 'O_NEGATIF']]
+      },
+      comment: 'Groupe sanguin du patient (système ABO/Rhésus)'
     },
     directives_anticipées: {
       type: DataTypes.TEXT,

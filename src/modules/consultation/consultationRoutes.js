@@ -187,6 +187,35 @@ router.get('/professionnel/:professionnel_id', consultationController.getConsult
 
 /**
  * @swagger
+ * /consultation/patient/{patient_id}:
+ *   get:
+ *     summary: Récupérer les consultations par patient
+ *     tags: [Consultations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patient_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du patient
+ *     responses:
+ *       200:
+ *         description: Consultations du patient récupérées avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Consultation'
+ *       500:
+ *         description: Erreur serveur
+ */
+router.get('/patient/:patient_id', consultationController.getConsultationsByPatient);
+
+/**
+ * @swagger
  * /consultation:
  *   post:
  *     summary: Créer une nouvelle consultation
@@ -239,6 +268,10 @@ router.get('/professionnel/:professionnel_id', consultationController.getConsult
  *               dossier_id:
  *                 type: integer
  *                 description: ID du dossier médical associé
+ *               patient_id:
+ *                 type: integer
+ *                 description: ID du patient (automatiquement extrait du dossier médical)
+ *                 readOnly: true
  *               professionnel_id:
  *                 type: integer
  *                 description: ID du professionnel de santé
@@ -325,6 +358,9 @@ router.post('/', authenticateToken, attachProfessionnel, consultationController.
  *               dossier_id:
  *                 type: integer
  *                 description: ID du dossier médical associé
+ *               patient_id:
+ *                 type: integer
+ *                 description: ID du patient associé à la consultation
  *               professionnel_id:
  *                 type: integer
  *                 description: ID du professionnel de santé

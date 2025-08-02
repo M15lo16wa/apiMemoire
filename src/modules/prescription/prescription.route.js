@@ -1,61 +1,111 @@
 const express = require('express');
 const router = express.Router();
-const { body, param } = require('express-validator');
-const prescriptionController = require('./prescription.controller');
+const PrescriptionController = require('./prescription.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
 const { authenticateToken } = require('../../middlewares/auth.middleware');
+const {
+  ordonnanceValidationRules,
+  demandeExamenValidationRules,
+  updateValidationRules,
+  searchValidationRules,
+  paramValidationRules,
+  renouvellementValidationRules,
+  suspensionValidationRules,
+  transfertValidationRules,
+  statsValidationRules
+} = require('./prescription.validators');
 
 /**
  * @swagger
  * tags:
  *   name: Prescription
- *   description: Gestion des ordonnances et demandes d'examen
+ *   description: Gestion moderne des ordonnances et demandes d'examen avec génération automatique
  */
 
-// Validation rules pour les ordonnances
-const ordonnanceValidationRules = [
-    body('patient_id').notEmpty().withMessage('L\'ID du patient est requis').isInt(),
-    body('dossier_id').optional().isInt().withMessage('L\'ID du dossier doit être un entier'),
-    body('consultation_id').optional().isInt().withMessage('L\'ID de la consultation doit être un entier'),
-    body('service_id').optional().isInt().withMessage('L\'ID du service doit être un entier'),
-    body('medicament').notEmpty().withMessage('Le médicament est requis').isLength({ max: 150 }),
-    body('dosage').notEmpty().withMessage('Le dosage est requis').isLength({ max: 100 }),
-    body('frequence').notEmpty().withMessage('La fréquence est requise').isLength({ max: 100 }),
-    body('duree').optional().isLength({ max: 100 }),
-    body('instructions').optional().isLength({ max: 1000 }),
-    body('voie_administration').optional().isIn(['orale', 'cutanée', 'nasale', 'oculaire', 'auriculaire', 'vaginale', 'rectale', 'inhalée', 'injection', 'autre']),
-    body('renouvelable').optional().isBoolean(),
-    body('nb_renouvellements').optional().isInt({ min: 0, max: 12 })
-];
-
-// Validation rules pour les demandes d'examen
-const demandeExamenValidationRules = [
-    body('patient_id').notEmpty().withMessage('L\'ID du patient est requis').isInt(),
-    body('dossier_id').optional().isInt().withMessage('L\'ID du dossier doit être un entier'),
-    body('consultation_id').optional().isInt().withMessage('L\'ID de la consultation doit être un entier'),
-    body('service_id').optional().isInt().withMessage('L\'ID du service doit être un entier'),
-    body('medicament').notEmpty().withMessage('Le type d\'examen est requis').isLength({ max: 150 }),
-    body('dosage').notEmpty().withMessage('Les paramètres d\'examen sont requis').isLength({ max: 100 }),
-    body('frequence').notEmpty().withMessage('La fréquence/urgence est requise').isLength({ max: 100 }),
-    body('instructions').optional().isLength({ max: 1000 })
-];
-
-// Validation rules pour les mises à jour
-const updateValidationRules = [
-    body('medicament').optional().isLength({ max: 150 }),
-    body('dosage').optional().isLength({ max: 100 }),
-    body('frequence').optional().isLength({ max: 100 }),
-    body('duree').optional().isLength({ max: 100 }),
-    body('instructions').optional().isLength({ max: 1000 }),
-    body('voie_administration').optional().isIn(['orale', 'cutanée', 'nasale', 'oculaire', 'auriculaire', 'vaginale', 'rectale', 'inhalée', 'injection', 'autre']),
-    body('statut').optional().isIn(['active', 'suspendue', 'terminee', 'annulee', 'en_attente'])
-];
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     PrescriptionModerne:
+ *       type: object
+ *       properties:
+ *         id_prescription:
+ *           type: integer
+ *           description: ID unique de la prescription
+ *         prescriptionNumber:
+ *           type: string
+ *           description: Numéro unique généré automatiquement (ORD-YYYY-XXXXXX ou EXA-YYYY-XXXXXX)
+ *           example: "ORD-2025-000001"
+ *         type_prescription:
+ *           type: string
+ *           enum: [ordonnance, examen]
+ *           description: Type de prescription
+ *         principe_actif:
+ *           type: string
+ *           description: Principe actif (DCI) ou type d'examen
+ *         nom_commercial:
+ *           type: string
+ *           description: Nom commercial du médicament
+ *         dosage:
+ *           type: string
+ *           description: Dosage prescrit ou paramètres d'examen
+ *         frequence:
+ *           type: string
+ *           description: Fréquence de prise ou urgence
+ *         voie_administration:
+ *           type: string
+ *           enum: [orale, cutanée, nasale, oculaire, auriculaire, vaginale, rectale, inhalée, injection, autre]
+ *         statut:
+ *           type: string
+ *           enum: [active, suspendue, terminee, annulee, en_attente]
+ *         qrCode:
+ *           type: string
+ *           description: QR Code généré automatiquement pour vérification
+ *         signatureElectronique:
+ *           type: string
+ *           description: Signature électronique du prescripteur
+ *         date_prescription:
+ *           type: string
+ *           format: date-time
+ *         patient:
+ *           $ref: '#/components/schemas/PatientInfo'
+ *         redacteur:
+ *           $ref: '#/components/schemas/ProfessionnelInfo'
+ *     PatientInfo:
+ *       type: object
+ *       properties:
+ *         id_patient:
+ *           type: integer
+ *         nom:
+ *           type: string
+ *         prenom:
+ *           type: string
+ *         date_naissance:
+ *           type: string
+ *           format: date
+ *     ProfessionnelInfo:
+ *       type: object
+ *       properties:
+ *         id_professionnel:
+ *           type: integer
+ *         numero_adeli:
+ *           type: string
+ *         specialite:
+ *           type: string
+ *         compteUtilisateur:
+ *           type: object
+ *           properties:
+ *             nom:
+ *               type: string
+ *             prenom:
+ *               type: string
+ */
 
 /**
  * @swagger
  * /prescription/ordonnance:
  *   post:
- *     summary: Créer une nouvelle ordonnance
+ *     summary: Créer une nouvelle ordonnance avec génération automatique
  *     tags: [Prescription]
  *     security:
  *       - bearerAuth: []
@@ -67,46 +117,66 @@ const updateValidationRules = [
  *             type: object
  *             required:
  *               - patient_id
- *               - medicament
+ *               - principe_actif
  *               - dosage
  *               - frequence
  *             properties:
  *               patient_id:
  *                 type: integer
+ *                 minimum: 1
  *                 description: ID du patient
  *               dossier_id:
  *                 type: integer
+ *                 minimum: 1
  *                 description: ID du dossier médical (optionnel)
- *               consultation_id:
- *                 type: integer
- *                 description: ID de la consultation (optionnel)
- *               service_id:
- *                 type: integer
- *                 description: ID du service (optionnel)
- *               medicament:
+ *               principe_actif:
  *                 type: string
- *                 maxLength: 150
- *                 description: Nom du médicament
+ *                 minLength: 2
+ *                 maxLength: 255
+ *                 description: Principe actif (DCI) du médicament
+ *                 example: "Paracétamol"
+ *               nom_commercial:
+ *                 type: string
+ *                 maxLength: 255
+ *                 description: Nom commercial du médicament
+ *                 example: "Doliprane"
+ *               code_cip:
+ *                 type: string
+ *                 pattern: "^\\d{13}$"
+ *                 description: Code CIP à 13 chiffres
  *               dosage:
  *                 type: string
+ *                 minLength: 1
  *                 maxLength: 100
  *                 description: Dosage prescrit
+ *                 example: "500mg"
+ *               forme_pharmaceutique:
+ *                 type: string
+ *                 enum: [comprimé, gélule, sirop, solution, pommade, crème, gel, suppositoire, injection, autre]
+ *               quantite:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 9999
+ *               unite:
+ *                 type: string
+ *                 enum: [boîte, flacon, tube, ampoule, sachet, comprimé, gélule, ml, g, mg, autre]
  *               frequence:
  *                 type: string
+ *                 minLength: 1
  *                 maxLength: 100
  *                 description: Fréquence de prise
- *               duree:
- *                 type: string
- *                 maxLength: 100
- *                 description: Durée du traitement
- *               instructions:
- *                 type: string
- *                 maxLength: 1000
- *                 description: Instructions spéciales
+ *                 example: "3 fois par jour"
  *               voie_administration:
  *                 type: string
  *                 enum: [orale, cutanée, nasale, oculaire, auriculaire, vaginale, rectale, inhalée, injection, autre]
- *                 description: Voie d'administration
+ *               duree_traitement:
+ *                 type: string
+ *                 pattern: "^(\\d+\\s*(jour|jours|semaine|semaines|mois|an|ans|heure|heures)|\\d+\\s*-\\s*\\d+\\s*(jour|jours|semaine|semaines|mois))$"
+ *                 example: "7 jours"
+ *               instructions_speciales:
+ *                 type: string
+ *                 maxLength: 1000
+ *                 description: Instructions particulières
  *               renouvelable:
  *                 type: boolean
  *                 description: Si la prescription est renouvelable
@@ -126,32 +196,39 @@ const updateValidationRules = [
  *                 status:
  *                   type: string
  *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Ordonnance créée avec succès"
  *                 data:
  *                   type: object
  *                   properties:
  *                     ordonnance:
- *                       $ref: '#/components/schemas/Prescription'
+ *                       $ref: '#/components/schemas/PrescriptionModerne'
+ *                     numero:
+ *                       type: string
+ *                       example: "ORD-2025-000001"
+ *                     qrCode:
+ *                       type: string
+ *                       description: QR Code en format Data URL
  *       400:
  *         description: Données invalides
  *       401:
  *         description: Non autorisé
  *       404:
- *         description: Patient ou professionnel non trouvé
+ *         description: Patient ou dossier non trouvé
  */
-
-// Routes pour les ordonnances
 router.post('/ordonnance', 
-    authenticateToken, 
-    ordonnanceValidationRules, 
-    handleValidationErrors, 
-    prescriptionController.createOrdonnance
+  authenticateToken, 
+  ordonnanceValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.createOrdonnance
 );
 
 /**
  * @swagger
  * /prescription/demande-examen:
  *   post:
- *     summary: Créer une demande d'examen
+ *     summary: Créer une demande d'examen avec génération automatique
  *     tags: [Prescription]
  *     security:
  *       - bearerAuth: []
@@ -163,38 +240,36 @@ router.post('/ordonnance',
  *             type: object
  *             required:
  *               - patient_id
- *               - medicament
- *               - dosage
- *               - frequence
+ *               - type_examen
  *             properties:
  *               patient_id:
  *                 type: integer
+ *                 minimum: 1
  *                 description: ID du patient
  *               dossier_id:
  *                 type: integer
+ *                 minimum: 1
  *                 description: ID du dossier médical (optionnel)
- *               consultation_id:
- *                 type: integer
- *                 description: ID de la consultation (optionnel)
- *               service_id:
- *                 type: integer
- *                 description: ID du service (optionnel)
- *               medicament:
+ *               type_examen:
  *                 type: string
- *                 maxLength: 150
+ *                 enum: [Radiographie, Scanner, IRM, Échographie, Endoscopie, Prise de sang, Analyse d'urine, ECG, EEG, Spirométrie, Biopsie, Mammographie, Coloscopie, Gastroscopie, Test allergologique, Bilan cardiologique, Bilan neurologique, Autre]
  *                 description: Type d'examen demandé
- *               dosage:
+ *               parametres:
  *                 type: string
- *                 maxLength: 100
- *                 description: Paramètres d'examen
- *               frequence:
+ *                 maxLength: 500
+ *                 description: Paramètres spécifiques de l'examen
+ *               urgence:
  *                 type: string
- *                 maxLength: 100
- *                 description: Fréquence/urgence de l'examen
- *               instructions:
+ *                 enum: [urgent, semi-urgent, normal, programmé]
+ *                 description: Niveau d'urgence
+ *               instructions_speciales:
  *                 type: string
  *                 maxLength: 1000
- *                 description: Instructions spéciales
+ *                 description: Instructions particulières
+ *               date_souhaitee:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Date souhaitée pour l'examen
  *     responses:
  *       201:
  *         description: Demande d'examen créée avec succès
@@ -206,25 +281,136 @@ router.post('/ordonnance',
  *                 status:
  *                   type: string
  *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Demande d'examen créée avec succès"
  *                 data:
  *                   type: object
  *                   properties:
  *                     demande:
- *                       $ref: '#/components/schemas/Prescription'
- *       400:
- *         description: Données invalides
- *       401:
- *         description: Non autorisé
- *       404:
- *         description: Patient ou professionnel non trouvé
+ *                       $ref: '#/components/schemas/PrescriptionModerne'
+ *                     numero:
+ *                       type: string
+ *                       example: "EXA-2025-000001"
+ *                     qrCode:
+ *                       type: string
+ *                       description: QR Code en format Data URL
  */
-
-// Routes pour les demandes d'examen
 router.post('/demande-examen', 
-    authenticateToken, 
-    demandeExamenValidationRules, 
-    handleValidationErrors, 
-    prescriptionController.createDemandeExamen
+  authenticateToken, 
+  demandeExamenValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.createDemandeExamen
+);
+
+/**
+ * @swagger
+ * /prescription/search:
+ *   get:
+ *     summary: Recherche avancée de prescriptions avec pagination
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Numéro de page
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Nombre d'éléments par page
+ *       - in: query
+ *         name: patient_id
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Filtrer par patient
+ *       - in: query
+ *         name: professionnel_id
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Filtrer par professionnel
+ *       - in: query
+ *         name: type_prescription
+ *         schema:
+ *           type: string
+ *           enum: [ordonnance, examen]
+ *         description: Filtrer par type
+ *       - in: query
+ *         name: statut
+ *         schema:
+ *           type: string
+ *           enum: [active, suspendue, terminee, annulee, en_attente]
+ *         description: Filtrer par statut
+ *       - in: query
+ *         name: search_term
+ *         schema:
+ *           type: string
+ *           minLength: 2
+ *           maxLength: 100
+ *         description: Recherche textuelle (numéro, principe actif, nom commercial)
+ *       - in: query
+ *         name: date_debut
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date de début de période
+ *       - in: query
+ *         name: date_fin
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date de fin de période
+ *     responses:
+ *       200:
+ *         description: Résultats de recherche
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     prescriptions:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/PrescriptionModerne'
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: integer
+ *                         page:
+ *                           type: integer
+ *                         limit:
+ *                           type: integer
+ *                         totalPages:
+ *                           type: integer
+ *                         hasNext:
+ *                           type: boolean
+ *                         hasPrev:
+ *                           type: boolean
+ */
+router.get('/search', 
+  authenticateToken, 
+  searchValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.searchPrescriptions
 );
 
 /**
@@ -241,6 +427,7 @@ router.post('/demande-examen',
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: ID du patient
  *       - in: query
  *         name: statut
@@ -249,47 +436,60 @@ router.post('/demande-examen',
  *           enum: [active, suspendue, terminee, annulee, en_attente]
  *         description: Filtrer par statut
  *       - in: query
- *         name: type
+ *         name: type_prescription
  *         schema:
  *           type: string
- *           enum: [traitement, examen]
- *         description: Filtrer par type (traitement ou examen)
+ *           enum: [ordonnance, examen]
+ *         description: Filtrer par type
  *       - in: query
- *         name: includes
+ *         name: page
  *         schema:
- *           type: string
- *         description: Modèles à inclure (patient,medecin,dossier,consultation)
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
  *     responses:
  *       200:
- *         description: Liste des prescriptions
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 results:
- *                   type: integer
- *                   description: Nombre de prescriptions
- *                 data:
- *                   type: object
- *                   properties:
- *                     prescriptions:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/Prescription'
- *       401:
- *         description: Non autorisé
- *       404:
- *         description: Patient non trouvé
+ *         description: Liste des prescriptions du patient
  */
-
-// Routes pour récupérer les prescriptions
 router.get('/patient/:patient_id', 
-    authenticateToken, 
-    prescriptionController.getPrescriptionsByPatient
+  authenticateToken, 
+  paramValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.getPrescriptionsByPatient
+);
+
+/**
+ * @swagger
+ * /prescription/patient/{patient_id}/actives:
+ *   get:
+ *     summary: Récupérer les prescriptions actives d'un patient
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: patient_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID du patient
+ *     responses:
+ *       200:
+ *         description: Prescriptions actives du patient
+ */
+router.get('/patient/:patient_id/actives', 
+  authenticateToken, 
+  paramValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.getPrescriptionsActives
 );
 
 /**
@@ -306,32 +506,19 @@ router.get('/patient/:patient_id',
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: ID de la prescription
  *     responses:
  *       200:
  *         description: Détail de la prescription
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     prescription:
- *                       $ref: '#/components/schemas/Prescription'
- *       401:
- *         description: Non autorisé
  *       404:
  *         description: Prescription non trouvée
  */
-
 router.get('/:id', 
-    authenticateToken, 
-    prescriptionController.getPrescriptionById
+  authenticateToken, 
+  paramValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.getPrescriptionById
 );
 
 /**
@@ -348,6 +535,7 @@ router.get('/:id',
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: ID de la prescription
  *     requestBody:
  *       required: true
@@ -356,64 +544,45 @@ router.get('/:id',
  *           schema:
  *             type: object
  *             properties:
- *               medicament:
+ *               principe_actif:
  *                 type: string
- *                 maxLength: 150
+ *                 minLength: 2
+ *                 maxLength: 255
  *               dosage:
  *                 type: string
+ *                 minLength: 1
  *                 maxLength: 100
  *               frequence:
  *                 type: string
+ *                 minLength: 1
  *                 maxLength: 100
- *               duree:
- *                 type: string
- *                 maxLength: 100
- *               instructions:
- *                 type: string
- *                 maxLength: 1000
- *               voie_administration:
- *                 type: string
- *                 enum: [orale, cutanée, nasale, oculaire, auriculaire, vaginale, rectale, inhalée, injection, autre]
  *               statut:
  *                 type: string
  *                 enum: [active, suspendue, terminee, annulee, en_attente]
+ *               instructions_speciales:
+ *                 type: string
+ *                 maxLength: 1000
  *     responses:
  *       200:
  *         description: Prescription mise à jour
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     prescription:
- *                       $ref: '#/components/schemas/Prescription'
  *       400:
  *         description: Données invalides
- *       401:
- *         description: Non autorisé
  *       404:
  *         description: Prescription non trouvée
  */
-
-// Routes pour modifier les prescriptions
 router.put('/:id', 
-    authenticateToken, 
-    updateValidationRules, 
-    handleValidationErrors, 
-    prescriptionController.updatePrescription
+  authenticateToken, 
+  paramValidationRules, 
+  updateValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.updatePrescription
 );
 
 /**
  * @swagger
  * /prescription/{id}:
  *   delete:
- *     summary: Supprimer une prescription
+ *     summary: Supprimer une prescription (soft delete)
  *     tags: [Prescription]
  *     security:
  *       - bearerAuth: []
@@ -423,19 +592,21 @@ router.put('/:id',
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: ID de la prescription
  *     responses:
- *       204:
+ *       200:
  *         description: Prescription supprimée
- *       401:
- *         description: Non autorisé
+ *       400:
+ *         description: Impossible de supprimer une prescription active
  *       404:
  *         description: Prescription non trouvée
  */
-
 router.delete('/:id', 
-    authenticateToken, 
-    prescriptionController.deletePrescription
+  authenticateToken, 
+  paramValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.deletePrescription
 );
 
 /**
@@ -452,6 +623,7 @@ router.delete('/:id',
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: ID de la prescription
  *     requestBody:
  *       content:
@@ -461,38 +633,30 @@ router.delete('/:id',
  *             properties:
  *               motif_renouvellement:
  *                 type: string
+ *                 minLength: 5
  *                 maxLength: 500
  *                 description: Motif du renouvellement
+ *               nouvelle_duree:
+ *                 type: string
+ *                 pattern: "^(\\d+\\s*(jour|jours|semaine|semaines|mois|an|ans))$"
+ *                 description: Nouvelle durée si différente
+ *               nouveau_dosage:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 100
+ *                 description: Nouveau dosage si modifié
  *     responses:
  *       200:
  *         description: Prescription renouvelée
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     prescription:
- *                       $ref: '#/components/schemas/Prescription'
  *       400:
- *         description: Prescription non renouvelable
- *       401:
- *         description: Non autorisé
- *       404:
- *         description: Prescription non trouvée
+ *         description: Prescription non renouvelable ou limite atteinte
  */
-
-// Routes spécialisées
 router.patch('/:id/renouveler', 
-    authenticateToken, 
-    [body('motif_renouvellement').optional().isLength({ max: 500 })], 
-    handleValidationErrors, 
-    prescriptionController.renouvelerPrescription
+  authenticateToken, 
+  paramValidationRules, 
+  renouvellementValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.renouvelerPrescription
 );
 
 /**
@@ -509,6 +673,7 @@ router.patch('/:id/renouveler',
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: ID de la prescription
  *     requestBody:
  *       required: true
@@ -521,45 +686,32 @@ router.patch('/:id/renouveler',
  *             properties:
  *               motif_arret:
  *                 type: string
+ *                 minLength: 5
  *                 maxLength: 500
  *                 description: Motif de l'arrêt
+ *               date_arret:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Date d'arrêt (par défaut maintenant)
  *     responses:
  *       200:
  *         description: Prescription suspendue
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     prescription:
- *                       $ref: '#/components/schemas/Prescription'
  *       400:
- *         description: Données invalides
- *       401:
- *         description: Non autorisé
- *       404:
- *         description: Prescription non trouvée
+ *         description: Seules les prescriptions actives peuvent être suspendues
  */
-
 router.patch('/:id/suspendre', 
-    authenticateToken, 
-    [body('motif_arret').notEmpty().withMessage('Le motif d\'arrêt est requis').isLength({ max: 500 })], 
-    handleValidationErrors, 
-    prescriptionController.suspendrePrescription
+  authenticateToken, 
+  paramValidationRules, 
+  suspensionValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.suspendrePrescription
 );
 
 /**
  * @swagger
  * /prescription/{id}/transferer:
  *   post:
- *     summary: Transférer une prescription à un patient
- *     description: Transfère une prescription existante vers le dossier médical d'un autre patient. Cette action est tracée dans l'historique des accès.
+ *     summary: Transférer une prescription à un autre patient
  *     tags: [Prescription]
  *     security:
  *       - bearerAuth: []
@@ -570,8 +722,7 @@ router.patch('/:id/suspendre',
  *         schema:
  *           type: integer
  *           minimum: 1
- *         description: ID de la prescription à transférer
- *         example: ID
+ *         description: ID de la prescription
  *     requestBody:
  *       required: true
  *       content:
@@ -584,140 +735,31 @@ router.patch('/:id/suspendre',
  *               patient_id:
  *                 type: integer
  *                 minimum: 1
- *                 description: ID du patient destinataire qui recevra la prescription
- *                 example: ID
- *           example:
- *             patient_id: ID
+ *                 description: ID du patient destinataire
+ *               motif_transfert:
+ *                 type: string
+ *                 minLength: 5
+ *                 maxLength: 500
+ *                 description: Motif du transfert
  *     responses:
  *       200:
  *         description: Prescription transférée avec succès
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 message:
- *                   type: string
- *                   example: "Prescription transférée avec succès"
- *                 data:
- *                   type: object
- *                   properties:
- *                     prescription:
- *                       $ref: '#/components/schemas/Prescription'
- *                     transfert:
- *                       type: object
- *                       properties:
- *                         date:
- *                           type: string
- *                           format: date-time
- *                           example: "2025-07-30T10:30:00Z"
- *                         effectue_par:
- *                           type: integer
- *                           example: 789
- *                         patient_destinataire:
- *                           type: integer
- *                           example: 456
- *       400:
- *         description: Données de requête invalides
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   examples:
- *                     missing_patient_id:
- *                       value: "ID du patient destinataire requis"
- *                     invalid_prescription_id:
- *                       value: "ID de prescription invalide"
- *                     invalid_patient_id:
- *                       value: "ID du patient destinataire invalide"
- *       401:
- *         description: Non autorisé - Token d'authentification requis ou invalide
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Token d'authentification requis"
- *       403:
- *         description: Permissions insuffisantes pour effectuer cette action
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Permissions insuffisantes pour transférer cette prescription"
  *       404:
- *         description: Ressource non trouvée
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   examples:
- *                     prescription_not_found:
- *                       value: "Prescription non trouvée"
- *                     patient_not_found:
- *                       value: "Patient destinataire non trouvé"
- *                     dossier_not_found:
- *                       value: "Dossier médical du patient destinataire non trouvé"
- *       500:
- *         description: Erreur serveur interne
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Impossible de transférer la prescription"
+ *         description: Prescription ou patient destinataire non trouvé
  */
 router.post('/:id/transferer',
-    authenticateToken,
-    [
-        param('id')
-            .isInt({ min: 1 })
-            .withMessage('ID de prescription invalide'),
-        body('patient_id')
-            .notEmpty()
-            .withMessage('ID du patient destinataire requis')
-            .isInt({ min: 1 })
-            .withMessage('ID du patient destinataire doit être un entier positif')
-    ],
-    handleValidationErrors,
-    prescriptionController.transfererPrescription
+  authenticateToken,
+  paramValidationRules,
+  transfertValidationRules,
+  handleValidationErrors,
+  PrescriptionController.transfererPrescription
 );
+
 /**
  * @swagger
- * /prescription/{id}/transferer:
+ * /prescription/{id}/rapport:
  *   get:
- *     summary: Récupérer une prescription par son ID
+ *     summary: Générer un rapport de prescription pour impression
  *     tags: [Prescription]
  *     security:
  *       - bearerAuth: []
@@ -727,10 +769,11 @@ router.post('/:id/transferer',
  *         required: true
  *         schema:
  *           type: integer
+ *           minimum: 1
  *         description: ID de la prescription
  *     responses:
  *       200:
- *         description: Détail de la prescription
+ *         description: Rapport généré avec succès
  *         content:
  *           application/json:
  *             schema:
@@ -742,51 +785,140 @@ router.post('/:id/transferer',
  *                 data:
  *                   type: object
  *                   properties:
- *                     prescription:
- *                       $ref: '#/components/schemas/Prescription'
- *       401:
- *         description: Non autorisé
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Token d'authentification requis"
- *       404:
- *         description: Prescription non trouvée
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Prescription non trouvée"
- *       500:
- *         description: Erreur serveur interne
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Erreur lors de la récupération de la prescription"
+ *                     rapport:
+ *                       type: object
+ *                       description: Données formatées pour impression
  */
-router.get('/:id', 
-    authenticateToken, 
-    prescriptionController.getPrescriptionById
+router.get('/:id/rapport', 
+  authenticateToken, 
+  paramValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.generateReport
 );
 
-module.exports = router; 
+/**
+ * @swagger
+ * /prescription/stats:
+ *   get:
+ *     summary: Calculer les statistiques de prescription
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: professionnel_id
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID du professionnel (par défaut utilisateur connecté)
+ *       - in: query
+ *         name: date_debut
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date de début de période
+ *       - in: query
+ *         name: date_fin
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date de fin de période
+ *     responses:
+ *       200:
+ *         description: Statistiques calculées
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     statistiques:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: integer
+ *                         par_type:
+ *                           type: object
+ *                           properties:
+ *                             ordonnances:
+ *                               type: integer
+ *                             examens:
+ *                               type: integer
+ *                         par_statut:
+ *                           type: object
+ */
+router.get('/stats', 
+  authenticateToken, 
+  statsValidationRules, 
+  handleValidationErrors, 
+  PrescriptionController.getStats
+);
+
+/**
+ * @swagger
+ * /prescription/validate/qr:
+ *   post:
+ *     summary: Valider un QR Code de prescription
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - qrData
+ *             properties:
+ *               qrData:
+ *                 type: string
+ *                 description: Données du QR Code à valider
+ *     responses:
+ *       200:
+ *         description: QR Code valide
+ *       400:
+ *         description: QR Code invalide
+ */
+router.post('/validate/qr', 
+  authenticateToken, 
+  PrescriptionController.validateQRCode
+);
+
+/**
+ * @swagger
+ * /prescription/validate/signature:
+ *   post:
+ *     summary: Valider une signature électronique
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - signature
+ *             properties:
+ *               signature:
+ *                 type: string
+ *                 description: Signature électronique à valider (base64)
+ *     responses:
+ *       200:
+ *         description: Signature valide
+ *       400:
+ *         description: Signature invalide
+ */
+router.post('/validate/signature', 
+  authenticateToken, 
+  PrescriptionController.validateSignature
+);
+
+module.exports = router;

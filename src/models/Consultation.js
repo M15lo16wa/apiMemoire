@@ -57,6 +57,10 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    patient_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     service_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
@@ -139,6 +143,7 @@ module.exports = (sequelize) => {
       confidentialite: consultationData.confidentialite || 'normal',
       dossier_id: consultationData.dossier_id,
       professionnel_id: consultationData.professionnel_id,
+      patient_id: consultationData.patient_id,
       service_id: consultationData.service_id,
       createdBy: consultationData.createdBy
     });

@@ -50,15 +50,33 @@ const { authenticateToken } = require('../../middlewares/auth.middleware');
  *         traitements_chroniques:
  *           type: object
  *           description: Traitements au long cours
- *         parametres_vitaux:
- *           type: object
- *           description: Derniers paramètres vitaux
+ *         heart_rate:
+ *           type: integer
+ *           description: Fréquence cardiaque (battements par minute)
+ *         blood_pressure:
+ *           type: string
+ *           description: Tension artérielle (format systolique/diastolique, ex 120/80)
+ *         temperature:
+ *           type: number
+ *           format: float
+ *           description: Température corporelle (en degrés Celsius)
+ *         respiratory_rate:
+ *           type: integer
+ *           description: Fréquence respiratoire (respirations par minute)
+ *         oxygen_saturation:
+ *           type: number
+ *           format: float
+ *           description: Saturation en oxygène (pourcentage)
  *         habitudes_vie:
  *           type: object
  *           description: Informations sur le mode de vie
  *         historique_familial:
  *           type: string
  *           description: Antécédents familiaux notables
+ *         groupe_sanguin:
+ *           type: string
+ *           enum: [A_POSITIF, A_NEGATIF, B_POSITIF, B_NEGATIF, AB_POSITIF, AB_NEGATIF, O_POSITIF, O_NEGATIF]
+ *           description: Groupe sanguin du patient (système ABO/Rhésus)
  *         directives_anticipées:
  *           type: string
  *           description: Directives anticipées et personnes de confiance
@@ -256,6 +274,27 @@ const { authenticateToken } = require('../../middlewares/auth.middleware');
  *                 type: string
  *                 format: date
  *                 description: Date de fermeture du dossier
+ *               heart_rate:
+ *                 type: integer
+ *                 description: Fréquence cardiaque (battements par minute)
+ *               blood_pressure:
+ *                 type: string
+ *                 description: Tension artérielle (format systolique/diastolique, ex 120/80)
+ *               temperature:
+ *                 type: number
+ *                 format: float
+ *                 description: Température corporelle (en degrés Celsius)
+ *               respiratory_rate:
+ *                 type: integer
+ *                 description: Fréquence respiratoire (respirations par minute)
+ *               oxygen_saturation:
+ *                 type: number
+ *                 format: float
+ *                 description: Saturation en oxygène (pourcentage)
+ *               groupe_sanguin:
+ *                 type: string
+ *                 enum: [A_POSITIF, A_NEGATIF, B_POSITIF, B_NEGATIF, AB_POSITIF, AB_NEGATIF, O_POSITIF, O_NEGATIF]
+ *                 description: Groupe sanguin du patient (système ABO/Rhésus)
  *     responses:
  *       200:
  *         description: Dossier médical mis à jour avec succès
@@ -435,7 +474,8 @@ const createDossierValidationRules = [
     body('numeroDossier').optional().isLength({ max: 50 }),
     body('statut').optional().isIn(['actif', 'ferme', 'archive', 'fusionne']),
     body('dateOuverture').optional().isISO8601().withMessage('La date d\'ouverture doit être au format ISO'),
-    body('dateFermeture').optional().isISO8601().withMessage('La date de fermeture doit être au format ISO')
+    body('dateFermeture').optional().isISO8601().withMessage('La date de fermeture doit être au format ISO'),
+    body('groupe_sanguin').optional().isIn(['A_POSITIF', 'A_NEGATIF', 'B_POSITIF', 'B_NEGATIF', 'AB_POSITIF', 'AB_NEGATIF', 'O_POSITIF', 'O_NEGATIF']).withMessage('Le groupe sanguin doit être valide')
 ];
 
 // Validation rules pour la mise à jour d'un dossier médical
@@ -445,7 +485,14 @@ const updateDossierValidationRules = [
     body('numeroDossier').optional().isLength({ max: 50 }),
     body('statut').optional().isIn(['actif', 'ferme', 'archive', 'fusionne']),
     body('dateOuverture').optional().isISO8601().withMessage('La date d\'ouverture doit être au format ISO'),
-    body('dateFermeture').optional().isISO8601().withMessage('La date de fermeture doit être au format ISO')
+    body('dateFermeture').optional().isISO8601().withMessage('La date de fermeture doit être au format ISO'),
+    // Validation des signes vitaux
+    body('heart_rate').optional().isInt({ min: 20, max: 300 }).withMessage('La fréquence cardiaque doit être entre 20 et 300 bpm'),
+    body('blood_pressure').optional().matches(/^\d{2,3}\/\d{2,3}$/).withMessage('La tension artérielle doit être au format systolique/diastolique (ex: 120/80)'),
+    body('temperature').optional().isFloat({ min: 30.0, max: 45.0 }).withMessage('La température doit être entre 30.0 et 45.0°C'),
+    body('respiratory_rate').optional().isInt({ min: 5, max: 60 }).withMessage('La fréquence respiratoire doit être entre 5 et 60 respirations/min'),
+    body('oxygen_saturation').optional().isFloat({ min: 0.0, max: 100.0 }).withMessage('La saturation en oxygène doit être entre 0.0 et 100.0%'),
+    body('groupe_sanguin').optional().isIn(['A_POSITIF', 'A_NEGATIF', 'B_POSITIF', 'B_NEGATIF', 'AB_POSITIF', 'AB_NEGATIF', 'O_POSITIF', 'O_NEGATIF']).withMessage('Le groupe sanguin doit être valide')
 ];
 
 const attachProfessionnel = require('../../middlewares/attachProfessionnel');

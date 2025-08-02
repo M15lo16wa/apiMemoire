@@ -469,9 +469,9 @@ const swaggerDefinition = {
             type: 'integer',
             description: 'ID du professionnel de santé'
           },
-          medicament: {
+          prescriptionNumber: {
             type: 'string',
-            description: 'Nom du médicament ou type d\'examen'
+            description: 'Numéro unique de prescription'
           },
           dosage: {
             type: 'string',
@@ -480,14 +480,6 @@ const swaggerDefinition = {
           frequence: {
             type: 'string',
             description: 'Fréquence de prise ou urgence'
-          },
-          duree: {
-            type: 'string',
-            description: 'Durée du traitement'
-          },
-          instructions: {
-            type: 'string',
-            description: 'Instructions spéciales'
           },
           prescrit_traitement: {
             type: 'boolean',
