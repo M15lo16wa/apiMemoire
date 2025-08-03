@@ -176,6 +176,269 @@ class DMPController {
   });
 
   /**
+   * Récupère les auto-mesures du patient
+   */
+  static getAutoMesures = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const filters = {
+      type_mesure: req.query.type_mesure,
+      date_debut: req.query.date_debut,
+      date_fin: req.query.date_fin,
+      limit: parseInt(req.query.limit) || 20,
+      offset: parseInt(req.query.offset) || 0
+    };
+
+    const autoMesures = await DMPService.getAutoMesures(patientId, filters);
+    
+    res.status(200).json({
+      status: 'success',
+      data: {
+        auto_mesures: autoMesures
+      }
+    });
+  });
+
+  /**
+   * Met à jour une auto-mesure
+   */
+  static updateAutoMesure = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const mesureId = req.params.id;
+    const mesureData = req.body;
+
+    const result = await DMPService.updateAutoMesure(patientId, mesureId, mesureData);
+    
+    res.status(200).json({
+      status: 'success',
+      message: result.message,
+      data: {
+        mesure: result.mesure
+      }
+    });
+  });
+
+  /**
+   * Supprime une auto-mesure
+   */
+  static deleteAutoMesure = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const mesureId = req.params.id;
+
+    const result = await DMPService.deleteAutoMesure(patientId, mesureId);
+    
+    res.status(200).json({
+      status: 'success',
+      message: result.message
+    });
+  });
+
+  /**
+   * Récupère les documents personnels du patient
+   */
+  static getDocumentsPersonnels = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    
+    const documents = await DMPService.getDocumentsPersonnels(patientId);
+    
+    res.status(200).json({
+      status: 'success',
+      data: {
+        documents_personnels: documents
+      }
+    });
+  });
+
+  /**
+   * Upload de documents personnels
+   */
+  static uploadDocumentPersonnel = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const { nom, type, description, url, taille, format } = req.body;
+
+    if (!nom || !type || !url) {
+      return next(new AppError('Nom, type et URL du document sont requis', 400));
+    }
+
+    const documentData = {
+      nom,
+      type,
+      description,
+      url,
+      taille,
+      format
+    };
+
+    const result = await DMPService.uploadDocumentPersonnel(patientId, documentData);
+    
+    res.status(201).json({
+      status: 'success',
+      message: result.message,
+      data: {
+        document: result.document
+      }
+    });
+  });
+
+  /**
+   * Supprime un document personnel
+   */
+  static deleteDocumentPersonnel = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const documentId = req.params.id;
+
+    const result = await DMPService.deleteDocumentPersonnel(patientId, documentId);
+    
+    res.status(200).json({
+      status: 'success',
+      message: result.message
+    });
+  });
+
+  /**
+   * Récupère les messages du patient
+   */
+  static getMessages = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const filters = {
+      lu: req.query.lu,
+      limit: parseInt(req.query.limit) || 20,
+      offset: parseInt(req.query.offset) || 0
+    };
+
+    const messages = await DMPService.getMessages(patientId, filters);
+    
+    res.status(200).json({
+      status: 'success',
+      data: {
+        messages: messages
+      }
+    });
+  });
+
+  /**
+   * Envoie un message sécurisé au médecin
+   */
+  static envoyerMessage = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const { professionnel_id, sujet, contenu } = req.body;
+
+    if (!professionnel_id || !sujet || !contenu) {
+      return next(new AppError('Professionnel, sujet et contenu sont requis', 400));
+    }
+
+    const messageData = {
+      professionnel_id,
+      sujet,
+      contenu
+    };
+
+    const result = await DMPService.envoyerMessage(patientId, messageData);
+    
+    res.status(201).json({
+      status: 'success',
+      message: result.message,
+      data: {
+        message: result.message
+      }
+    });
+  });
+
+  /**
+   * Supprime un message
+   */
+  static deleteMessage = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const messageId = req.params.id;
+
+    const result = await DMPService.deleteMessage(patientId, messageId);
+    
+    res.status(200).json({
+      status: 'success',
+      message: result.message
+    });
+  });
+
+  /**
+   * Récupère les rappels du patient
+   */
+  static getRappels = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    
+    const rappels = await DMPService.getRappels(patientId);
+    
+    res.status(200).json({
+      status: 'success',
+      data: {
+        rappels: rappels
+      }
+    });
+  });
+
+  /**
+   * Crée un nouveau rappel
+   */
+  static creerRappel = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const { type, titre, description, date_rappel, priorite } = req.body;
+
+    if (!type || !titre || !date_rappel) {
+      return next(new AppError('Type, titre et date de rappel sont requis', 400));
+    }
+
+    const rappelData = {
+      type,
+      titre,
+      description,
+      date_rappel,
+      priorite: priorite || 'moyenne'
+    };
+
+    const result = await DMPService.creerRappel(patientId, rappelData);
+    
+    res.status(201).json({
+      status: 'success',
+      message: result.message,
+      data: {
+        rappel: result.rappel
+      }
+    });
+  });
+
+  /**
+   * Met à jour un rappel
+   */
+  static updateRappel = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const rappelId = req.params.id;
+    const rappelData = req.body;
+
+    const result = await DMPService.updateRappel(patientId, rappelId, rappelData);
+    
+    res.status(200).json({
+      status: 'success',
+      message: result.message,
+      data: {
+        rappel: result.rappel
+      }
+    });
+  });
+
+  /**
+   * Supprime un rappel
+   */
+  static deleteRappel = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const rappelId = req.params.id;
+
+    const result = await DMPService.deleteRappel(patientId, rappelId);
+    
+    res.status(200).json({
+      status: 'success',
+      message: result.message
+    });
+  });
+
+  /**
    * Génère une fiche d'urgence avec QR Code
    */
   static genererFicheUrgence = catchAsync(async (req, res, next) => {
@@ -206,25 +469,6 @@ class DMPController {
       data: {
         rendez_vous: []
       }
-    });
-  });
-
-  /**
-   * Envoie un message sécurisé au médecin
-   */
-  static envoyerMessage = catchAsync(async (req, res, next) => {
-    const patientId = req.patient.id_patient;
-    const { professionnel_id, sujet, message } = req.body;
-
-    if (!professionnel_id || !sujet || !message) {
-      return next(new AppError('Professionnel, sujet et message sont requis', 400));
-    }
-
-    // Cette fonctionnalité sera implémentée dans un service de messagerie
-    // Pour l'instant, retourner un message d'information
-    res.status(201).json({
-      status: 'success',
-      message: 'Fonctionnalité de messagerie sécurisée en cours de développement'
     });
   });
 
@@ -294,55 +538,6 @@ class DMPController {
       status: 'success',
       data: {
         bibliotheque_sante: bibliotheque
-      }
-    });
-  });
-
-  /**
-   * Upload de documents personnels
-   */
-  static uploadDocumentPersonnel = catchAsync(async (req, res, next) => {
-    const patientId = req.patient.id_patient;
-    const { titre, description, type_document } = req.body;
-
-    if (!req.file) {
-      return next(new AppError('Aucun fichier uploadé', 400));
-    }
-
-    if (!titre || !type_document) {
-      return next(new AppError('Titre et type de document sont requis', 400));
-    }
-
-    // Cette fonctionnalité sera implémentée avec multer pour l'upload
-    // Pour l'instant, retourner un message d'information
-    res.status(201).json({
-      status: 'success',
-      message: 'Fonctionnalité d\'upload de documents en cours de développement'
-    });
-  });
-
-  /**
-   * Récupère les documents personnels du patient
-   */
-  static getDocumentsPersonnels = catchAsync(async (req, res, next) => {
-    const patientId = req.patient.id_patient;
-
-    // Simuler des documents personnels (à adapter selon vos besoins)
-    const documents = [
-      {
-        id: 1,
-        titre: 'Résultats analyse étranger',
-        type: 'analyse',
-        date_upload: new Date(),
-        taille: '2.5 MB',
-        url: '/documents/1'
-      }
-    ];
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        documents_personnels: documents
       }
     });
   });

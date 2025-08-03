@@ -306,49 +306,6 @@ router.patch('/informations-personnelles', DMPController.updateInformationsPerso
 
 /**
  * @swagger
- * /patient/dmp/auto-mesures:
- *   post:
- *     summary: Ajoute une auto-mesure du patient
- *     tags: [DMP - Patient]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - type_mesure
- *               - valeur
- *             properties:
- *               type_mesure:
- *                 type: string
- *                 enum: [poids, taille, tension_arterielle, glycemie, temperature]
- *                 description: Type de mesure
- *               valeur:
- *                 type: number
- *                 description: Valeur de la mesure
- *               unite:
- *                 type: string
- *                 description: Unité de mesure
- *               commentaire:
- *                 type: string
- *                 description: Commentaire optionnel
- *     responses:
- *       201:
- *         description: Auto-mesure ajoutée avec succès
- *       400:
- *         description: Données invalides
- *       401:
- *         description: Non authentifié
- *       403:
- *         description: Accès refusé
- */
-router.post('/auto-mesures', DMPController.ajouterAutoMesure);
-
-/**
- * @swagger
  * /patient/dmp/fiche-urgence:
  *   get:
  *     summary: Génère une fiche d'urgence avec QR Code
@@ -439,91 +396,6 @@ router.get('/rendez-vous', DMPController.getRendezVous);
 
 /**
  * @swagger
- * /patient/dmp/messagerie:
- *   post:
- *     summary: Envoie un message sécurisé au médecin
- *     tags: [DMP - Patient]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - professionnel_id
- *               - sujet
- *               - message
- *             properties:
- *               professionnel_id:
- *                 type: integer
- *                 description: ID du professionnel destinataire
- *               sujet:
- *                 type: string
- *                 description: Sujet du message
- *               message:
- *                 type: string
- *                 description: Contenu du message
- *     responses:
- *       201:
- *         description: Message envoyé avec succès
- *       400:
- *         description: Données invalides
- *       401:
- *         description: Non authentifié
- *       403:
- *         description: Accès refusé
- */
-router.post('/messagerie', DMPController.envoyerMessage);
-
-/**
- * @swagger
- * /patient/dmp/rappels:
- *   get:
- *     summary: Récupère les rappels et plan de soins personnalisé
- *     tags: [DMP - Patient]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Rappels récupérés avec succès
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     rappels:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           type:
- *                             type: string
- *                             enum: [medicament, vaccin, controle]
- *                           message:
- *                             type: string
- *                           date:
- *                             type: string
- *                             format: date-time
- *                           priorite:
- *                             type: string
- *                             enum: [haute, moyenne, basse]
- *       401:
- *         description: Non authentifié
- *       403:
- *         description: Accès refusé
- */
-router.get('/rappels', DMPController.getRappels);
-
-/**
- * @swagger
  * /patient/dmp/bibliotheque-sante:
  *   get:
  *     summary: Récupère la bibliothèque de santé
@@ -550,6 +422,512 @@ router.get('/rappels', DMPController.getRappels);
  *         description: Accès refusé
  */
 router.get('/bibliotheque-sante', DMPController.getBibliothequeSante);
+
+/**
+ * @swagger
+ * /patient/dmp/auto-mesures:
+ *   get:
+ *     summary: Récupère les auto-mesures du patient
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type_mesure
+ *         schema:
+ *           type: string
+ *           enum: [poids, taille, tension_arterielle, glycemie, temperature, saturation]
+ *         description: Type de mesure à filtrer
+ *       - in: query
+ *         name: date_debut
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date de début pour filtrer
+ *       - in: query
+ *         name: date_fin
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Date de fin pour filtrer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Nombre maximum de résultats
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: Nombre de résultats à ignorer
+ *     responses:
+ *       200:
+ *         description: Auto-mesures récupérées avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.get('/auto-mesures', DMPController.getAutoMesures);
+
+/**
+ * @swagger
+ * /patient/dmp/auto-mesures:
+ *   post:
+ *     summary: Ajoute une auto-mesure
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type_mesure
+ *               - valeur
+ *             properties:
+ *               type_mesure:
+ *                 type: string
+ *                 enum: [poids, taille, tension_arterielle, glycemie, temperature, saturation]
+ *               valeur:
+ *                 type: number
+ *               valeur_secondaire:
+ *                 type: number
+ *               unite:
+ *                 type: string
+ *               unite_secondaire:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Auto-mesure ajoutée avec succès
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.post('/auto-mesures', DMPController.ajouterAutoMesure);
+
+/**
+ * @swagger
+ * /patient/dmp/auto-mesures/{id}:
+ *   put:
+ *     summary: Met à jour une auto-mesure
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de l'auto-mesure
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               type_mesure:
+ *                 type: string
+ *               valeur:
+ *                 type: number
+ *               valeur_secondaire:
+ *                 type: number
+ *               unite:
+ *                 type: string
+ *               unite_secondaire:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Auto-mesure mise à jour avec succès
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Auto-mesure non trouvée
+ */
+router.put('/auto-mesures/:id', DMPController.updateAutoMesure);
+
+/**
+ * @swagger
+ * /patient/dmp/auto-mesures/{id}:
+ *   delete:
+ *     summary: Supprime une auto-mesure
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de l'auto-mesure
+ *     responses:
+ *       200:
+ *         description: Auto-mesure supprimée avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Auto-mesure non trouvée
+ */
+router.delete('/auto-mesures/:id', DMPController.deleteAutoMesure);
+
+/**
+ * @swagger
+ * /patient/dmp/documents:
+ *   get:
+ *     summary: Récupère les documents personnels du patient
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Documents personnels récupérés avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.get('/documents', DMPController.getDocumentsPersonnels);
+
+/**
+ * @swagger
+ * /patient/dmp/documents:
+ *   post:
+ *     summary: Upload de documents personnels
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - nom
+ *               - type
+ *               - url
+ *             properties:
+ *               nom:
+ *                 type: string
+ *                 description: Nom du document
+ *               type:
+ *                 type: string
+ *                 enum: [ordonnance, resultat, certificat, autre]
+ *               description:
+ *                 type: string
+ *                 description: Description optionnelle
+ *               url:
+ *                 type: string
+ *                 description: URL du document
+ *               taille:
+ *                 type: integer
+ *                 description: Taille du fichier en bytes
+ *               format:
+ *                 type: string
+ *                 description: Format du fichier
+ *     responses:
+ *       201:
+ *         description: Document uploadé avec succès
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.post('/documents', DMPController.uploadDocumentPersonnel);
+
+/**
+ * @swagger
+ * /patient/dmp/documents/{id}:
+ *   delete:
+ *     summary: Supprime un document personnel
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du document
+ *     responses:
+ *       200:
+ *         description: Document supprimé avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Document non trouvé
+ */
+router.delete('/documents/:id', DMPController.deleteDocumentPersonnel);
+
+/**
+ * @swagger
+ * /patient/dmp/messages:
+ *   get:
+ *     summary: Récupère les messages du patient
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: lu
+ *         schema:
+ *           type: boolean
+ *         description: Filtrer par statut lu/non lu
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Nombre maximum de résultats
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: Nombre de résultats à ignorer
+ *     responses:
+ *       200:
+ *         description: Messages récupérés avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.get('/messages', DMPController.getMessages);
+
+/**
+ * @swagger
+ * /patient/dmp/messages:
+ *   post:
+ *     summary: Envoie un message sécurisé au médecin
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - professionnel_id
+ *               - sujet
+ *               - contenu
+ *             properties:
+ *               professionnel_id:
+ *                 type: integer
+ *                 description: ID du professionnel destinataire
+ *               sujet:
+ *                 type: string
+ *                 description: Sujet du message
+ *               contenu:
+ *                 type: string
+ *                 description: Contenu du message
+ *     responses:
+ *       201:
+ *         description: Message envoyé avec succès
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.post('/messages', DMPController.envoyerMessage);
+
+/**
+ * @swagger
+ * /patient/dmp/messages/{id}:
+ *   delete:
+ *     summary: Supprime un message
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du message
+ *     responses:
+ *       200:
+ *         description: Message supprimé avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Message non trouvé
+ */
+router.delete('/messages/:id', DMPController.deleteMessage);
+
+/**
+ * @swagger
+ * /patient/dmp/rappels:
+ *   get:
+ *     summary: Récupère les rappels du patient
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Rappels récupérés avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.get('/rappels', DMPController.getRappels);
+
+/**
+ * @swagger
+ * /patient/dmp/rappels:
+ *   post:
+ *     summary: Crée un nouveau rappel
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type
+ *               - titre
+ *               - date_rappel
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [medicament, vaccin, controle, rendez_vous, autre]
+ *               titre:
+ *                 type: string
+ *                 description: Titre du rappel
+ *               description:
+ *                 type: string
+ *                 description: Description optionnelle
+ *               date_rappel:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Date et heure du rappel
+ *               priorite:
+ *                 type: string
+ *                 enum: [basse, moyenne, haute]
+ *                 default: moyenne
+ *     responses:
+ *       201:
+ *         description: Rappel créé avec succès
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.post('/rappels', DMPController.creerRappel);
+
+/**
+ * @swagger
+ * /patient/dmp/rappels/{id}:
+ *   put:
+ *     summary: Met à jour un rappel
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du rappel
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               type:
+ *                 type: string
+ *               titre:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               date_rappel:
+ *                 type: string
+ *                 format: date-time
+ *               priorite:
+ *                 type: string
+ *               actif:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Rappel mis à jour avec succès
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Rappel non trouvé
+ */
+router.put('/rappels/:id', DMPController.updateRappel);
+
+/**
+ * @swagger
+ * /patient/dmp/rappels/{id}:
+ *   delete:
+ *     summary: Supprime un rappel
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID du rappel
+ *     responses:
+ *       200:
+ *         description: Rappel supprimé avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Rappel non trouvé
+ */
+router.delete('/rappels/:id', DMPController.deleteRappel);
 
 /**
  * @swagger

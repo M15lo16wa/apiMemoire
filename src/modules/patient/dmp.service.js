@@ -1,4 +1,4 @@
-const { Patient, DossierMedical, Prescription, Consultation, ExamenLabo, AutorisationAcces, HistoriqueAccess, ProfessionnelSante, RendezVous } = require('../../models');
+const { Patient, DossierMedical, Prescription, Consultation, ExamenLabo, AutorisationAcces, HistoriqueAccess, ProfessionnelSante, RendezVous, AutoMesure, DocumentPersonnel, Message, Rappel } = require('../../models');
 const { Op } = require('sequelize');
 const AppError = require('../../utils/appError');
 const QRCode = require('qrcode');
@@ -17,8 +17,8 @@ class DMPService {
         include: [
           {
             model: DossierMedical,
-            as: 'dossierMedical',
-            attributes: ['groupe_sanguin', 'allergies', 'maladies_chroniques', 'poids', 'taille', 'tension_arterielle']
+            as: 'dossiers',
+            attributes: ['groupe_sanguin', 'allergies', 'blood_pressure', 'heart_rate', 'temperature', 'oxygen_saturation']
           },
           {
             model: RendezVous,
@@ -58,9 +58,12 @@ class DMPService {
           prenom: patient.prenom,
           date_naissance: patient.date_naissance,
           identifiant: patient.numero_assure,
-          groupe_sanguin: patient.dossierMedical?.groupe_sanguin,
-          allergies: patient.dossierMedical?.allergies,
-          maladies_chroniques: patient.dossierMedical?.maladies_chroniques
+          groupe_sanguin: patient.dossiers?.[0]?.groupe_sanguin,
+          allergies: patient.dossiers?.[0]?.allergies,
+          tension_arterielle: patient.dossiers?.[0]?.blood_pressure,
+          frequence_cardiaque: patient.dossiers?.[0]?.heart_rate,
+          temperature: patient.dossiers?.[0]?.temperature,
+          saturation_oxygene: patient.dossiers?.[0]?.oxygen_saturation
         },
         prochains_rendez_vous: patient.rendezVous || [],
         dernieres_activites: dernieresActivites,
@@ -97,7 +100,7 @@ class DMPService {
             attributes: ['nom', 'prenom', 'specialite', 'numero_adeli']
           }
         ],
-        order: [['date_consultation', 'DESC']],
+        order: [['createdAt', 'DESC']],
         limit,
         offset
       });
@@ -109,16 +112,16 @@ class DMPService {
           {
             model: ProfessionnelSante,
             as: 'redacteur',
-            attributes: ['nom', 'prenom', 'specialite', 'numero_adeli']
+            attributes: ['nom', 'prenom', 'specialite']
           }
         ],
-        order: [['date_prescription', 'DESC']],
+        order: [['createdAt', 'DESC']],
         limit,
         offset
       });
 
-      // Récupérer les examens de laboratoire
-      const examensLabo = await ExamenLabo.findAll({
+      // Récupérer les examens
+      const examens = await ExamenLabo.findAll({
         where: whereClause,
         include: [
           {
@@ -127,7 +130,7 @@ class DMPService {
             attributes: ['nom', 'prenom', 'specialite']
           }
         ],
-        order: [['date_examen', 'DESC']],
+        order: [['createdAt', 'DESC']],
         limit,
         offset
       });
@@ -135,7 +138,7 @@ class DMPService {
       return {
         consultations,
         prescriptions,
-        examens_laboratoire: examensLabo
+        examens
       };
     } catch (error) {
       console.error('Erreur lors de la récupération de l\'historique médical:', error);
@@ -158,17 +161,13 @@ class DMPService {
         };
       }
 
-      if (type) {
-        whereClause.type_acces = type;
-      }
-
-      const activites = await HistoriqueAccess.findAll({
+      const journal = await HistoriqueAccess.findAll({
         where: whereClause,
         include: [
           {
             model: ProfessionnelSante,
             as: 'professionnel',
-            attributes: ['nom', 'prenom', 'specialite', 'numero_adeli']
+            attributes: ['nom', 'prenom', 'specialite']
           }
         ],
         order: [['date_acces', 'DESC']],
@@ -176,7 +175,7 @@ class DMPService {
         offset
       });
 
-      return activites;
+      return journal;
     } catch (error) {
       console.error('Erreur lors de la récupération du journal d\'activité:', error);
       throw error;
@@ -184,23 +183,23 @@ class DMPService {
   }
 
   /**
-   * Gère les droits d'accès du patient
+   * Récupère les droits d'accès du patient
    */
   static async getDroitsAcces(patientId) {
     try {
-      const autorisations = await AutorisationAcces.findAll({
+      const droitsAcces = await AutorisationAcces.findAll({
         where: { patient_id: patientId },
         include: [
           {
             model: ProfessionnelSante,
-            as: 'professionnel',
-            attributes: ['id_professionnel', 'nom', 'prenom', 'specialite', 'numero_adeli', 'hopital_id']
+            as: 'professionnelDemandeur',
+            attributes: ['nom', 'prenom', 'specialite', 'numero_adeli']
           }
         ],
-        order: [['date_autorisation', 'DESC']]
+        order: [['createdAt', 'DESC']]
       });
 
-      return autorisations;
+      return droitsAcces;
     } catch (error) {
       console.error('Erreur lors de la récupération des droits d\'accès:', error);
       throw error;
@@ -215,10 +214,10 @@ class DMPService {
       // Vérifier que le professionnel existe
       const professionnel = await ProfessionnelSante.findByPk(professionnelId);
       if (!professionnel) {
-        throw new AppError('Professionnel de santé non trouvé', 404);
+        throw new AppError('Professionnel non trouvé', 404);
       }
 
-      // Vérifier si l'autorisation existe déjà
+      // Vérifier que l'autorisation n'existe pas déjà
       const autorisationExistante = await AutorisationAcces.findOne({
         where: {
           patient_id: patientId,
@@ -227,28 +226,19 @@ class DMPService {
       });
 
       if (autorisationExistante) {
-        throw new AppError('Ce professionnel a déjà accès à votre dossier', 409);
+        throw new AppError('Autorisation déjà accordée', 400);
       }
 
       // Créer l'autorisation
-      const nouvelleAutorisation = await AutorisationAcces.create({
+      const autorisation = await AutorisationAcces.create({
         patient_id: patientId,
         professionnel_id: professionnelId,
-        date_autorisation: new Date(),
-        statut: 'active',
-        permissions: JSON.stringify(permissions)
+        permissions: JSON.stringify(permissions),
+        statut: 'actif',
+        date_autorisation: new Date()
       });
 
-      // Enregistrer l'activité
-      await HistoriqueAccess.create({
-        patient_id: patientId,
-        professionnel_id: professionnelId,
-        type_acces: 'autorisation',
-        description: `Autorisation accordée à ${professionnel.nom} ${professionnel.prenom}`,
-        date_acces: new Date()
-      });
-
-      return nouvelleAutorisation;
+      return autorisation;
     } catch (error) {
       console.error('Erreur lors de l\'autorisation d\'accès:', error);
       throw error;
@@ -268,25 +258,17 @@ class DMPService {
       });
 
       if (!autorisation) {
-        throw new AppError('Aucune autorisation trouvée pour ce professionnel', 404);
+        throw new AppError('Autorisation non trouvée', 404);
       }
 
-      // Récupérer les informations du professionnel pour le log
-      const professionnel = await ProfessionnelSante.findByPk(professionnelId);
-
-      // Supprimer l'autorisation
-      await autorisation.destroy();
-
-      // Enregistrer l'activité
-      await HistoriqueAccess.create({
-        patient_id: patientId,
-        professionnel_id: professionnelId,
-        type_acces: 'revocation',
-        description: `Accès révoqué pour ${professionnel?.nom || 'Professionnel'} ${professionnel?.prenom || ''}`,
-        date_acces: new Date()
+      await autorisation.update({
+        statut: 'revoke',
+        date_revocation: new Date()
       });
 
-      return { message: 'Accès révoqué avec succès' };
+      return {
+        message: 'Accès révoqué avec succès'
+      };
     } catch (error) {
       console.error('Erreur lors de la révocation d\'accès:', error);
       throw error;
@@ -303,17 +285,11 @@ class DMPService {
         throw new AppError('Patient non trouvé', 404);
       }
 
-      // Mettre à jour les informations personnelles
-      const informationsPersonnelles = {
-        personne_urgence: informations.personne_urgence,
-        telephone_urgence: informations.telephone_urgence,
-        antecedents_familiaux: informations.antecedents_familiaux,
-        habitudes_vie: informations.habitudes_vie
+      await patient.update(informations);
+
+      return {
+        message: 'Informations personnelles mises à jour avec succès'
       };
-
-      await patient.update(informationsPersonnelles);
-
-      return { message: 'Informations personnelles mises à jour avec succès' };
     } catch (error) {
       console.error('Erreur lors de la mise à jour des informations personnelles:', error);
       throw error;
@@ -321,32 +297,354 @@ class DMPService {
   }
 
   /**
-   * Ajoute des auto-mesures du patient
+   * Ajoute une auto-mesure du patient
    */
   static async ajouterAutoMesure(patientId, mesure) {
     try {
-      const dossierMedical = await DossierMedical.findOne({
-        where: { patient_id: patientId }
-      });
-
-      if (!dossierMedical) {
-        throw new AppError('Dossier médical non trouvé', 404);
-      }
-
-      // Ajouter la mesure au dossier médical
-      const autoMesures = dossierMedical.auto_mesures ? JSON.parse(dossierMedical.auto_mesures) : [];
-      autoMesures.push({
+      const autoMesure = await AutoMesure.create({
+        patient_id: patientId,
         ...mesure,
-        date_mesure: new Date().toISOString()
+        date_mesure: new Date()
       });
 
-      await dossierMedical.update({
-        auto_mesures: JSON.stringify(autoMesures)
-      });
-
-      return { message: 'Auto-mesure ajoutée avec succès' };
+      return {
+        message: 'Auto-mesure ajoutée avec succès',
+        mesure: autoMesure
+      };
     } catch (error) {
       console.error('Erreur lors de l\'ajout de l\'auto-mesure:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les auto-mesures du patient
+   */
+  static async getAutoMesures(patientId, filters = {}) {
+    try {
+      const { type_mesure, date_debut, date_fin, limit = 20, offset = 0 } = filters;
+
+      const whereClause = { patient_id: patientId };
+      
+      if (type_mesure) {
+        whereClause.type_mesure = type_mesure;
+      }
+      
+      if (date_debut && date_fin) {
+        whereClause.date_mesure = {
+          [Op.between]: [date_debut, date_fin]
+        };
+      }
+
+      const autoMesures = await AutoMesure.findAll({
+        where: whereClause,
+        order: [['date_mesure', 'DESC']],
+        limit,
+        offset,
+        include: [
+          {
+            model: Patient,
+            as: 'patient',
+            attributes: ['nom', 'prenom']
+          }
+        ]
+      });
+
+      return autoMesures;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des auto-mesures:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Met à jour une auto-mesure
+   */
+  static async updateAutoMesure(patientId, mesureId, mesureData) {
+    try {
+      const mesure = await AutoMesure.findOne({
+        where: { id: mesureId, patient_id: patientId }
+      });
+
+      if (!mesure) {
+        throw new AppError('Auto-mesure non trouvée', 404);
+      }
+
+      await mesure.update(mesureData);
+
+      return {
+        message: 'Auto-mesure mise à jour avec succès',
+        mesure
+      };
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de l\'auto-mesure:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprime une auto-mesure
+   */
+  static async deleteAutoMesure(patientId, mesureId) {
+    try {
+      const mesure = await AutoMesure.findOne({
+        where: { id: mesureId, patient_id: patientId }
+      });
+
+      if (!mesure) {
+        throw new AppError('Auto-mesure non trouvée', 404);
+      }
+
+      await mesure.destroy();
+
+      return {
+        message: 'Auto-mesure supprimée avec succès'
+      };
+    } catch (error) {
+      console.error('Erreur lors de la suppression de l\'auto-mesure:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les documents personnels du patient
+   */
+  static async getDocumentsPersonnels(patientId) {
+    try {
+      const documents = await DocumentPersonnel.findAll({
+        where: { patient_id: patientId },
+        order: [['createdAt', 'DESC']],
+        include: [
+          {
+            model: Patient,
+            as: 'patient',
+            attributes: ['nom', 'prenom']
+          }
+        ]
+      });
+
+      return documents;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des documents personnels:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Upload un document personnel
+   */
+  static async uploadDocumentPersonnel(patientId, documentData) {
+    try {
+      const document = await DocumentPersonnel.create({
+        patient_id: patientId,
+        ...documentData
+      });
+
+      return {
+        message: 'Document uploadé avec succès',
+        document
+      };
+    } catch (error) {
+      console.error('Erreur lors de l\'upload du document:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprime un document personnel
+   */
+  static async deleteDocumentPersonnel(patientId, documentId) {
+    try {
+      const document = await DocumentPersonnel.findOne({
+        where: { id: documentId, patient_id: patientId }
+      });
+
+      if (!document) {
+        throw new AppError('Document non trouvé', 404);
+      }
+
+      await document.destroy();
+
+      return {
+        message: 'Document supprimé avec succès'
+      };
+    } catch (error) {
+      console.error('Erreur lors de la suppression du document:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les messages du patient
+   */
+  static async getMessages(patientId, filters = {}) {
+    try {
+      const { lu, limit = 20, offset = 0 } = filters;
+
+      const whereClause = { patient_id: patientId };
+      
+      if (lu !== undefined) {
+        whereClause.lu = lu;
+      }
+
+      const messages = await Message.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: ProfessionnelSante,
+            as: 'professionnel',
+            attributes: ['nom', 'prenom', 'specialite']
+          }
+        ],
+        order: [['date_envoi', 'DESC']],
+        limit,
+        offset
+      });
+
+      return messages;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des messages:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Envoie un message
+   */
+  static async envoyerMessage(patientId, messageData) {
+    try {
+      const message = await Message.create({
+        patient_id: patientId,
+        ...messageData,
+        date_envoi: new Date()
+      });
+
+      return {
+        message: 'Message envoyé avec succès',
+        message: message
+      };
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi du message:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprime un message
+   */
+  static async deleteMessage(patientId, messageId) {
+    try {
+      const message = await Message.findOne({
+        where: { id: messageId, patient_id: patientId }
+      });
+
+      if (!message) {
+        throw new AppError('Message non trouvé', 404);
+      }
+
+      await message.destroy();
+
+      return {
+        message: 'Message supprimé avec succès'
+      };
+    } catch (error) {
+      console.error('Erreur lors de la suppression du message:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les rappels du patient
+   */
+  static async getRappels(patientId) {
+    try {
+      const rappels = await Rappel.findAll({
+        where: { 
+          patient_id: patientId,
+          actif: true
+        },
+        order: [['date_rappel', 'ASC']],
+        include: [
+          {
+            model: Patient,
+            as: 'patient',
+            attributes: ['nom', 'prenom']
+          }
+        ]
+      });
+
+      return rappels;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des rappels:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crée un nouveau rappel
+   */
+  static async creerRappel(patientId, rappelData) {
+    try {
+      const rappel = await Rappel.create({
+        patient_id: patientId,
+        ...rappelData
+      });
+
+      return {
+        message: 'Rappel créé avec succès',
+        rappel
+      };
+    } catch (error) {
+      console.error('Erreur lors de la création du rappel:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Met à jour un rappel
+   */
+  static async updateRappel(patientId, rappelId, rappelData) {
+    try {
+      const rappel = await Rappel.findOne({
+        where: { id: rappelId, patient_id: patientId }
+      });
+
+      if (!rappel) {
+        throw new AppError('Rappel non trouvé', 404);
+      }
+
+      await rappel.update(rappelData);
+
+      return {
+        message: 'Rappel mis à jour avec succès',
+        rappel
+      };
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du rappel:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Supprime un rappel
+   */
+  static async deleteRappel(patientId, rappelId) {
+    try {
+      const rappel = await Rappel.findOne({
+        where: { id: rappelId, patient_id: patientId }
+      });
+
+      if (!rappel) {
+        throw new AppError('Rappel non trouvé', 404);
+      }
+
+      await rappel.destroy();
+
+      return {
+        message: 'Rappel supprimé avec succès'
+      };
+    } catch (error) {
+      console.error('Erreur lors de la suppression du rappel:', error);
       throw error;
     }
   }
@@ -360,7 +658,7 @@ class DMPService {
         include: [
           {
             model: DossierMedical,
-            as: 'dossierMedical'
+            as: 'dossiers'
           }
         ]
       });
@@ -375,10 +673,10 @@ class DMPService {
         telephone: patient.telephone,
         personne_urgence: patient.personne_urgence,
         telephone_urgence: patient.telephone_urgence,
-        groupe_sanguin: patient.dossierMedical?.groupe_sanguin,
-        allergies: patient.dossierMedical?.allergies,
-        maladies_chroniques: patient.dossierMedical?.maladies_chroniques,
-        traitement_cours: patient.dossierMedical?.traitement_cours,
+        groupe_sanguin: patient.dossiers?.[0]?.groupe_sanguin,
+        allergies: patient.dossiers?.[0]?.allergies,
+        tension_arterielle: patient.dossiers?.[0]?.blood_pressure,
+        traitement_cours: patient.dossiers?.[0]?.traitements_chroniques,
         identifiant: patient.numero_assure
       };
 
@@ -388,8 +686,8 @@ class DMPService {
         nom: patient.nom,
         prenom: patient.prenom,
         telephone: patient.telephone,
-        groupe_sanguin: patient.dossierMedical?.groupe_sanguin,
-        allergies: patient.dossierMedical?.allergies
+        groupe_sanguin: patient.dossiers?.[0]?.groupe_sanguin,
+        allergies: patient.dossiers?.[0]?.allergies
       };
 
       const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));

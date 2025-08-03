@@ -13,6 +13,13 @@ const HistoriqueAccess = require('./HistoriqueAccess')(sequelize);
 const AutorisationAcces = require('./AutorisationAcces')(sequelize);
 const ServiceSante = require('./ServiceSante')(sequelize);
 const Hopital = require('./Hopital')(sequelize);
+
+// --- Nouveaux modèles DMP ---
+const AutoMesure = require('./AutoMesure')(sequelize);
+const DocumentPersonnel = require('./DocumentPersonnel')(sequelize);
+const Message = require('./Message')(sequelize);
+const Rappel = require('./Rappel')(sequelize);
+
 // 19. ExamenLabo et ProfessionnelSante (prescripteur et validateur)
 ProfessionnelSante.hasMany(ExamenLabo, { foreignKey: 'prescripteur_id', as: 'examensPrescrits', onDelete: 'SET NULL' });
 ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'prescripteur_id', as: 'prescripteur' });
@@ -141,6 +148,27 @@ ServiceSante.belongsTo(Utilisateur, { foreignKey: 'createdBy', as: 'createurServ
 Utilisateur.hasMany(ServiceSante, { foreignKey: 'updatedBy', as: 'servicesModifies', onDelete: 'SET NULL' });
 ServiceSante.belongsTo(Utilisateur, { foreignKey: 'updatedBy', as: 'dernierModificateurService' });
 
+// --- Nouvelles associations DMP ---
+
+// 22. Patient et AutoMesure (One-to-Many)
+Patient.hasMany(AutoMesure, { foreignKey: 'patient_id', as: 'autoMesures', onDelete: 'CASCADE' });
+AutoMesure.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
+
+// 23. Patient et DocumentPersonnel (One-to-Many)
+Patient.hasMany(DocumentPersonnel, { foreignKey: 'patient_id', as: 'documentsPersonnels', onDelete: 'CASCADE' });
+DocumentPersonnel.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
+
+// 24. Patient et Message (One-to-Many)
+Patient.hasMany(Message, { foreignKey: 'patient_id', as: 'messages', onDelete: 'CASCADE' });
+Message.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
+
+// 25. ProfessionnelSante et Message (One-to-Many)
+ProfessionnelSante.hasMany(Message, { foreignKey: 'professionnel_id', as: 'messages', onDelete: 'CASCADE' });
+Message.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnel' });
+
+// 26. Patient et Rappel (One-to-Many)
+Patient.hasMany(Rappel, { foreignKey: 'patient_id', as: 'rappels', onDelete: 'CASCADE' });
+Rappel.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 
 // --- Exportez sequelize et tous les modèles ---
 module.exports = {
@@ -157,4 +185,9 @@ module.exports = {
   AutorisationAcces,
   ServiceSante,
   Hopital,
+  // Nouveaux modèles DMP
+  AutoMesure,
+  DocumentPersonnel,
+  Message,
+  Rappel,
 };
