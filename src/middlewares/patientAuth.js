@@ -25,6 +25,8 @@ const patientAuth = catchAsync(async (req, res, next) => {
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
+    console.log('🔍 patientAuth - Token décodé:', decoded);
+    console.log('🔍 patientAuth - Rôle dans le token:', decoded.role);
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
       return next(new AppError('Token invalide. Veuillez vous reconnecter.', 401));
@@ -36,8 +38,15 @@ const patientAuth = catchAsync(async (req, res, next) => {
     return next(new AppError('Erreur d\'authentification.', 401));
   }
 
-  // 3) Check if patient still exists
-  const currentPatient = await Patient.findByPk(decoded.id);
+  // 3) Vérifier que c'est bien un token patient
+  if (decoded.role !== 'patient') {
+    console.log('❌ patientAuth - Token non patient, rôle:', decoded.role);
+    return next(new AppError('Token non autorisé pour l\'accès patient.', 403));
+  }
+
+  // 4) Check if patient still exists
+  const patientId = decoded.patient_id || decoded.id;
+  const currentPatient = await Patient.findByPk(patientId);
   if (!currentPatient) {
     return next(
       new AppError('Le patient propriétaire de ce token n\'existe plus.', 401)

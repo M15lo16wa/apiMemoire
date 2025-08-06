@@ -1,11 +1,89 @@
 const DMPService = require('./dmp.service');
 const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/appError');
+const { Patient, DocumentPersonnel, AutoMesure, Message, Rappel } = require('../../models');
 
 /**
  * Contrôleur pour les fonctionnalités DMP (Dossier Médical Partagé)
  */
 class DMPController {
+
+  /**
+   * Récupère les informations générales du DMP du patient
+   */
+  static getDMPOverview = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    
+    try {
+      // Récupérer les informations de base du patient
+      const patient = await Patient.findByPk(patientId, {
+        attributes: ['id_patient', 'nom', 'prenom', 'date_naissance', 'sexe', 'email', 'telephone']
+      });
+
+      if (!patient) {
+        throw new AppError('Patient non trouvé', 404);
+      }
+
+      // Compter les documents personnels
+      const totalDocuments = await DocumentPersonnel.count({
+        where: { patient_id: patientId }
+      });
+
+      // Compter les auto-mesures
+      const totalAutoMesures = await AutoMesure.count({
+        where: { patient_id: patientId }
+      });
+
+      // Compter les messages
+      const totalMessages = await Message.count({
+        where: { patient_id: patientId }
+      });
+
+      // Compter les rappels
+      const totalRappels = await Rappel.count({
+        where: { patient_id: patientId }
+      });
+
+      // Données de base pour l'overview
+      const dmpOverview = {
+        patient: {
+          id: patient.id_patient,
+          nom: patient.nom,
+          prenom: patient.prenom,
+          date_naissance: patient.date_naissance,
+          sexe: patient.sexe,
+          email: patient.email,
+          telephone: patient.telephone
+        },
+        statistiques: {
+          total_documents: totalDocuments,
+          total_auto_mesures: totalAutoMesures,
+          total_messages: totalMessages,
+          total_rappels: totalRappels
+        },
+        derniere_activite: new Date(),
+        notifications: [
+          {
+            id: 1,
+            type: 'info',
+            message: 'Bienvenue dans votre espace DMP',
+            date: new Date(),
+            lu: false
+          }
+        ]
+      };
+      
+      res.status(200).json({
+        status: 'success',
+        data: {
+          dmp: dmpOverview
+        }
+      });
+    } catch (error) {
+      console.error('Erreur dans getDMPOverview:', error);
+      throw error;
+    }
+  });
 
   /**
    * Récupère le tableau de bord personnalisé du patient
@@ -473,42 +551,6 @@ class DMPController {
   });
 
   /**
-   * Récupère les rappels et plan de soins personnalisé
-   */
-  static getRappels = catchAsync(async (req, res, next) => {
-    const patientId = req.patient.id_patient;
-
-    // Simuler des rappels (à adapter selon vos besoins)
-    const rappels = [
-      {
-        type: 'medicament',
-        message: 'N\'oubliez pas de prendre votre médicament X',
-        date: new Date(),
-        priorite: 'haute'
-      },
-      {
-        type: 'vaccin',
-        message: 'Il est temps de faire votre vaccin de rappel',
-        date: new Date(),
-        priorite: 'moyenne'
-      },
-      {
-        type: 'controle',
-        message: 'Votre prochain contrôle pour le diabète est recommandé dans 3 mois',
-        date: new Date(),
-        priorite: 'basse'
-      }
-    ];
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        rappels
-      }
-    });
-  });
-
-  /**
    * Récupère la bibliothèque de santé
    */
   static getBibliothequeSante = catchAsync(async (req, res, next) => {
@@ -563,6 +605,27 @@ class DMPController {
       data: {
         statistiques
       }
+    });
+  });
+
+  /**
+   * Récupère les notifications d'accès DMP pour le patient
+   */
+  static getNotificationsAccesDMP = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const filters = {
+      limit: parseInt(req.query.limit) || 20,
+      offset: parseInt(req.query.offset) || 0,
+      type_notification: req.query.type_notification,
+      statut_envoi: req.query.statut_envoi
+    };
+
+    const notifications = await DMPService.getNotificationsAccesDMP(patientId, filters);
+    
+    // Retourner la structure attendue par le frontend
+    res.status(200).json({
+      status: 'success',
+      notifications: notifications // Structure simplifiée pour le frontend
     });
   });
 }

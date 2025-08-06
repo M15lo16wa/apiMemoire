@@ -9,6 +9,60 @@ const QRCode = require('qrcode');
 class DMPService {
   
   /**
+   * Récupère les informations générales du DMP du patient
+   */
+  static async getDMPOverview(patientId) {
+    try {
+      const patient = await Patient.findByPk(patientId, {
+        include: [
+          {
+            model: DossierMedical,
+            as: 'dossiers',
+            attributes: ['groupe_sanguin', 'allergies', 'blood_pressure', 'heart_rate', 'temperature', 'oxygen_saturation']
+          }
+        ]
+      });
+
+      if (!patient) {
+        throw new AppError('Patient non trouvé', 404);
+      }
+
+      // Compter les documents personnels
+      const totalDocuments = await DocumentPersonnel.count({
+        where: { patient_id: patientId }
+      });
+
+      // Compter les consultations
+      const totalConsultations = await Consultation.count({
+        where: { patient_id: patientId }
+      });
+
+      // Compter les prescriptions
+      const totalPrescriptions = await Prescription.count({
+        where: { patient_id: patientId }
+      });
+
+      // Récupérer la dernière activité
+      const derniereActivite = await this.getDerniereActivite(patientId);
+
+      return {
+        patient_id: patient.id_patient,
+        nom: patient.nom,
+        prenom: patient.prenom,
+        date_naissance: patient.date_naissance,
+        groupe_sanguin: patient.dossiers?.[0]?.groupe_sanguin,
+        derniere_activite: derniereActivite,
+        total_documents: totalDocuments,
+        total_consultations: totalConsultations,
+        total_prescriptions: totalPrescriptions
+      };
+    } catch (error) {
+      console.error('Erreur lors de la récupération des informations DMP:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Récupère le tableau de bord personnalisé du patient
    */
   static async getTableauDeBord(patientId) {
@@ -19,24 +73,6 @@ class DMPService {
             model: DossierMedical,
             as: 'dossiers',
             attributes: ['groupe_sanguin', 'allergies', 'blood_pressure', 'heart_rate', 'temperature', 'oxygen_saturation']
-          },
-          {
-            model: RendezVous,
-            as: 'rendezVous',
-            where: {
-              date_rdv: {
-                [Op.gte]: new Date()
-              }
-            },
-            order: [['date_rdv', 'ASC']],
-            limit: 5,
-            include: [
-              {
-                model: ProfessionnelSante,
-                as: 'professionnel',
-                attributes: ['nom', 'prenom', 'specialite']
-              }
-            ]
           }
         ]
       });
@@ -65,7 +101,7 @@ class DMPService {
           temperature: patient.dossiers?.[0]?.temperature,
           saturation_oxygene: patient.dossiers?.[0]?.oxygen_saturation
         },
-        prochains_rendez_vous: patient.rendezVous || [],
+        prochains_rendez_vous: [], // TODO: Implémenter la récupération des rendez-vous via les infos patient
         dernieres_activites: dernieresActivites,
         notifications: notifications
       };
@@ -163,14 +199,7 @@ class DMPService {
 
       const journal = await HistoriqueAccess.findAll({
         where: whereClause,
-        include: [
-          {
-            model: ProfessionnelSante,
-            as: 'professionnel',
-            attributes: ['nom', 'prenom', 'specialite']
-          }
-        ],
-        order: [['date_acces', 'DESC']],
+        order: [['date_heure_acces', 'DESC']],
         limit,
         offset
       });
@@ -229,13 +258,19 @@ class DMPService {
         throw new AppError('Autorisation déjà accordée', 400);
       }
 
-      // Créer l'autorisation
-      const autorisation = await AutorisationAcces.create({
+      // Créer l'autorisation avec les bons noms de colonnes
+      const autorisation = await AutorisationAcces.creerAutorisation({
+        type_acces: 'lecture',
+        date_debut: new Date(),
+        date_fin: null,
+        statut: 'actif',
+        raison_demande: 'Autorisation accordée par le patient',
+        conditions_acces: permissions,
         patient_id: patientId,
         professionnel_id: professionnelId,
-        permissions: JSON.stringify(permissions),
-        statut: 'actif',
-        date_autorisation: new Date()
+        accorde_par: patientId, // Le patient accorde l'autorisation
+        validateur_id: patientId,
+        createdBy: patientId
       });
 
       return autorisation;
@@ -262,8 +297,9 @@ class DMPService {
       }
 
       await autorisation.update({
-        statut: 'revoke',
-        date_revocation: new Date()
+        statut: 'refuse',
+        date_revocation: new Date(),
+        motif_revocation: 'Révoqué par le patient'
       });
 
       return {
@@ -709,15 +745,8 @@ class DMPService {
   static async getDernieresActivites(patientId, limit = 10) {
     try {
       const activites = await HistoriqueAccess.findAll({
-        where: { patient_id: patientId },
-        include: [
-          {
-            model: ProfessionnelSante,
-            as: 'professionnel',
-            attributes: ['nom', 'prenom', 'specialite']
-          }
-        ],
-        order: [['date_acces', 'DESC']],
+        where: { id_patient: patientId },
+        order: [['date_heure_acces', 'DESC']],
         limit
       });
 
@@ -729,30 +758,114 @@ class DMPService {
   }
 
   /**
-   * Récupère les notifications récentes
+   * Récupère les notifications récentes du patient
    */
   static async getNotificationsRecentes(patientId, limit = 5) {
     try {
-      // Simuler des notifications (à adapter selon vos besoins)
+      // Simuler des notifications récentes
       const notifications = [
         {
+          id: 1,
           type: 'nouveau_document',
-          message: 'Nouveau compte rendu disponible',
+          message: 'Nouveau document ajouté à votre DMP',
           date: new Date(),
           lu: false
         },
         {
-          type: 'rendez_vous',
-          message: 'Rappel: Rendez-vous demain à 14h00',
+          id: 2,
+          type: 'rappel_rendez_vous',
+          message: 'Rappel: Rendez-vous demain à 14h',
           date: new Date(),
-          lu: false
+          lu: true
         }
       ];
 
-      return notifications;
+      return notifications.slice(0, limit);
     } catch (error) {
       console.error('Erreur lors de la récupération des notifications:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Récupère les notifications d'accès DMP pour le patient
+   */
+  static async getNotificationsAccesDMP(patientId, filters = {}) {
+    try {
+      const { limit = 20, offset = 0, type_notification, statut_envoi } = filters;
+
+      const whereClause = { patient_id: patientId };
+      
+      if (type_notification) {
+        whereClause.type_notification = type_notification;
+      }
+      
+      if (statut_envoi) {
+        whereClause.statut_envoi = statut_envoi;
+      }
+
+      const { NotificationAccesDMP, ProfessionnelSante } = require('../../models');
+      
+      const notifications = await NotificationAccesDMP.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: ProfessionnelSante,
+            as: 'professionnel',
+            attributes: ['nom', 'prenom', 'specialite', 'numero_adeli']
+          }
+        ],
+        order: [['date_creation', 'DESC']],
+        limit,
+        offset
+      });
+
+      return notifications;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des notifications d\'accès DMP:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Récupère la dernière activité du patient
+   */
+  static async getDerniereActivite(patientId) {
+    try {
+      // Chercher la dernière activité parmi les consultations, prescriptions, etc.
+      const derniereConsultation = await Consultation.findOne({
+        where: { patient_id: patientId },
+        order: [['createdAt', 'DESC']],
+        attributes: ['createdAt']
+      });
+
+      const dernierePrescription = await Prescription.findOne({
+        where: { patient_id: patientId },
+        order: [['createdAt', 'DESC']],
+        attributes: ['createdAt']
+      });
+
+      const dernierDocument = await DocumentPersonnel.findOne({
+        where: { patient_id: patientId },
+        order: [['createdAt', 'DESC']],
+        attributes: ['createdAt']
+      });
+
+      // Trouver la date la plus récente
+      const dates = [
+        derniereConsultation?.createdAt,
+        dernierePrescription?.createdAt,
+        dernierDocument?.createdAt
+      ].filter(date => date);
+
+      if (dates.length === 0) {
+        return null;
+      }
+
+      return new Date(Math.max(...dates.map(date => new Date(date))));
+    } catch (error) {
+      console.error('Erreur lors de la récupération de la dernière activité:', error);
+      return null;
     }
   }
 }

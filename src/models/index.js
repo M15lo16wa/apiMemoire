@@ -20,6 +20,11 @@ const DocumentPersonnel = require('./DocumentPersonnel')(sequelize);
 const Message = require('./Message')(sequelize);
 const Rappel = require('./Rappel')(sequelize);
 
+// --- Modèles DMP Access ---
+const SessionAccesDMP = require('./SessionAccesDMP')(sequelize);
+const TentativeAuthentificationCPS = require('./TentativeAuthentificationCPS')(sequelize);
+const NotificationAccesDMP = require('./NotificationAccesDMP')(sequelize);
+
 // 19. ExamenLabo et ProfessionnelSante (prescripteur et validateur)
 ProfessionnelSante.hasMany(ExamenLabo, { foreignKey: 'prescripteur_id', as: 'examensPrescrits', onDelete: 'SET NULL' });
 ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'prescripteur_id', as: 'prescripteur' });
@@ -33,7 +38,6 @@ ExamenLabo.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 // 21. Consultation et ExamenLabo (One-to-Many) - exams can be linked to consultations
 Consultation.hasMany(ExamenLabo, { foreignKey: 'consultation_id', as: 'examensLabo', onDelete: 'SET NULL' });
 ExamenLabo.belongsTo(Consultation, { foreignKey: 'consultation_id', as: 'consultation' });
-
 
 // --- Définir les associations ---
 // Utilisez les noms de modèles et les clés étrangères que nous avons analysées
@@ -87,90 +91,75 @@ Prescription.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 ProfessionnelSante.hasMany(RendezVous, { foreignKey: 'id_professionnel', as: 'rendezVousAffectes', onDelete: 'SET NULL' });
 RendezVous.belongsTo(ProfessionnelSante, { foreignKey: 'id_professionnel', as: 'affecteA' });
 
-// 10. Patient et RendezVous (One-to-Many)
-Patient.hasMany(RendezVous, { foreignKey: 'patient_id', as: 'rendezVous', onDelete: 'CASCADE' });
-RendezVous.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patientConcerne' });
+// 10. Patient et RendezVous (One-to-Many) - COMMENTÉ car la table RendezVous contient directement les infos patient
+// Patient.hasMany(RendezVous, { foreignKey: 'patient_id', as: 'rendezVous', onDelete: 'CASCADE' });
+// RendezVous.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patientConcerne' });
 
-// 11. ProfessionnelSante et HistoriqueAccess (One-to-Many)
-ProfessionnelSante.hasMany(HistoriqueAccess, { foreignKey: 'professionnel_id', as: 'historiquesAcces', onDelete: 'SET NULL' });
-HistoriqueAccess.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnelAccedant' });
+// 11. ProfessionnelSante et HistoriqueAccess (One-to-Many) - COMMENTÉ car la table n'a pas professionnel_id
+// ProfessionnelSante.hasMany(HistoriqueAccess, { foreignKey: 'professionnel_id', as: 'historiquesAcces', onDelete: 'SET NULL' });
+// HistoriqueAccess.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnel' });
 
 // 11.1. Patient et AutorisationAcces (One-to-Many) - patients can have multiple access authorizations
 Patient.hasMany(AutorisationAcces, { foreignKey: 'patient_id', as: 'autorisationsRecues', onDelete: 'CASCADE' });
 AutorisationAcces.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patientConcerne' });
 
-// 11.2. ProfessionnelSante et AutorisationAcces (requesting professional)
-ProfessionnelSante.hasMany(AutorisationAcces, { foreignKey: 'professionnel_id', as: 'autorisationsDemandees', onDelete: 'SET NULL' });
+// 11.2. ProfessionnelSante et AutorisationAcces (One-to-Many) - professionnels can have multiple access authorizations
+ProfessionnelSante.hasMany(AutorisationAcces, { foreignKey: 'professionnel_id', as: 'autorisationsAccordees', onDelete: 'CASCADE' });
 AutorisationAcces.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnelDemandeur' });
 
-// 12. HistoriqueAccess et AutorisationAcces (One-to-One) - si une auto. a 1 historique et vice-versa
-HistoriqueAccess.hasOne(AutorisationAcces, { foreignKey: 'historique_id', as: 'autorisationLiee', onDelete: 'CASCADE' });
-AutorisationAcces.belongsTo(HistoriqueAccess, { foreignKey: 'historique_id', as: 'historique' });
+// --- Associations DMP Access ---
 
-// 13. ProfessionnelSante et AutorisationAcces (One-to-Many - l'autorisateur)
-ProfessionnelSante.hasMany(AutorisationAcces, { foreignKey: 'autorisateur_id', as: 'autorisationsDonnees', onDelete: 'SET NULL' });
-AutorisationAcces.belongsTo(ProfessionnelSante, { foreignKey: 'autorisateur_id', as: 'autorisateur' });
+// 22. ProfessionnelSante et SessionAccesDMP (One-to-Many)
+ProfessionnelSante.hasMany(SessionAccesDMP, { foreignKey: 'professionnel_id', as: 'sessionsAcces', onDelete: 'CASCADE' });
+SessionAccesDMP.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnel' });
 
-// 13.1. ServiceSante et ExamenLabo (One-to-Many) - exams can be associated with services
-ServiceSante.hasMany(ExamenLabo, { foreignKey: 'service_id', as: 'examensService', onDelete: 'SET NULL' });
-ExamenLabo.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'service' });
+// 23. Patient et SessionAccesDMP (One-to-Many)
+Patient.hasMany(SessionAccesDMP, { foreignKey: 'patient_id', as: 'sessionsAcces', onDelete: 'CASCADE' });
+SessionAccesDMP.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 
+// 24. ProfessionnelSante et TentativeAuthentificationCPS (One-to-Many)
+ProfessionnelSante.hasMany(TentativeAuthentificationCPS, { foreignKey: 'professionnel_id', as: 'tentativesCPS', onDelete: 'CASCADE' });
+TentativeAuthentificationCPS.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnel' });
 
-// 14. Hopital et ServiceSante (One-to-Many)
-Hopital.hasMany(ServiceSante, { foreignKey: 'hopital_id', as: 'services', onDelete: 'CASCADE' });
-ServiceSante.belongsTo(Hopital, { foreignKey: 'hopital_id', as: 'hopital' });
+// 25. Patient et NotificationAccesDMP (One-to-Many)
+Patient.hasMany(NotificationAccesDMP, { foreignKey: 'patient_id', as: 'notificationsAcces', onDelete: 'CASCADE' });
+NotificationAccesDMP.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 
-// 15. ServiceSante et ProfessionnelSante (One-to-Many) - Confirmé valide avec service_id sur ProfessionnelSante
-ServiceSante.hasMany(ProfessionnelSante, { foreignKey: 'service_id', as: 'professionnelsDuService', onDelete: 'SET NULL' });
-ProfessionnelSante.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'serviceSante' });
+// 26. ProfessionnelSante et NotificationAccesDMP (One-to-Many)
+ProfessionnelSante.hasMany(NotificationAccesDMP, { foreignKey: 'professionnel_id', as: 'notificationsEnvoyees', onDelete: 'CASCADE' });
+NotificationAccesDMP.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnel' });
 
+// 27. SessionAccesDMP et NotificationAccesDMP (One-to-Many)
+SessionAccesDMP.hasMany(NotificationAccesDMP, { foreignKey: 'session_id', as: 'notifications', onDelete: 'CASCADE' });
+NotificationAccesDMP.belongsTo(SessionAccesDMP, { foreignKey: 'session_id', as: 'session' });
 
-// 16. DossierMedical et ProfessionnelSante (pour le médecin référent)
-ProfessionnelSante.hasMany(DossierMedical, { foreignKey: 'medecin_referent_id', as: 'dossiersSuivis', onDelete: 'SET NULL' });
-DossierMedical.belongsTo(ProfessionnelSante, { foreignKey: 'medecin_referent_id', as: 'medecinReferent' });
+// --- Associations pour les nouveaux modèles DMP ---
 
-// 17. DossierMedical et ServiceSante (pour le service responsable)
-ServiceSante.hasMany(DossierMedical, { foreignKey: 'service_id', as: 'dossiersServices', onDelete: 'SET NULL' });
-DossierMedical.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'serviceResponsable' });
-
-// 18. DossierMedical et Utilisateur (pour le créateur et le dernier modificateur)
-Utilisateur.hasMany(DossierMedical, { foreignKey: 'createdBy', as: 'dossiersCrees', onDelete: 'SET NULL' });
-DossierMedical.belongsTo(Utilisateur, { foreignKey: 'createdBy', as: 'createur' });
-
-Utilisateur.hasMany(DossierMedical, { foreignKey: 'updatedBy', as: 'dossiersModifies', onDelete: 'SET NULL' });
-DossierMedical.belongsTo(Utilisateur, { foreignKey: 'updatedBy', as: 'dernierModificateur' });
-
-// NOUVELLES ASSOCIATIONS pour ServiceSante (createdBy, updatedBy)
-// Un utilisateur peut créer ou modifier plusieurs services.
-Utilisateur.hasMany(ServiceSante, { foreignKey: 'createdBy', as: 'servicesCrees', onDelete: 'SET NULL' });
-ServiceSante.belongsTo(Utilisateur, { foreignKey: 'createdBy', as: 'createurService' });
-
-Utilisateur.hasMany(ServiceSante, { foreignKey: 'updatedBy', as: 'servicesModifies', onDelete: 'SET NULL' });
-ServiceSante.belongsTo(Utilisateur, { foreignKey: 'updatedBy', as: 'dernierModificateurService' });
-
-// --- Nouvelles associations DMP ---
-
-// 22. Patient et AutoMesure (One-to-Many)
+// 28. Patient et AutoMesure (One-to-Many)
 Patient.hasMany(AutoMesure, { foreignKey: 'patient_id', as: 'autoMesures', onDelete: 'CASCADE' });
 AutoMesure.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 
-// 23. Patient et DocumentPersonnel (One-to-Many)
+// 29. Patient et DocumentPersonnel (One-to-Many)
 Patient.hasMany(DocumentPersonnel, { foreignKey: 'patient_id', as: 'documentsPersonnels', onDelete: 'CASCADE' });
 DocumentPersonnel.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 
-// 24. Patient et Message (One-to-Many)
-Patient.hasMany(Message, { foreignKey: 'patient_id', as: 'messages', onDelete: 'CASCADE' });
-Message.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
+// 30. Patient et Message (One-to-Many) - messages reçus
+Patient.hasMany(Message, { foreignKey: 'destinataire_id', as: 'messagesRecus', onDelete: 'CASCADE' });
+Message.belongsTo(Patient, { foreignKey: 'destinataire_id', as: 'destinataire' });
 
-// 25. ProfessionnelSante et Message (One-to-Many)
-ProfessionnelSante.hasMany(Message, { foreignKey: 'professionnel_id', as: 'messages', onDelete: 'CASCADE' });
-Message.belongsTo(ProfessionnelSante, { foreignKey: 'professionnel_id', as: 'professionnel' });
+// 31. ProfessionnelSante et Message (One-to-Many) - messages envoyés
+ProfessionnelSante.hasMany(Message, { foreignKey: 'expediteur_id', as: 'messagesEnvoyes', onDelete: 'CASCADE' });
+Message.belongsTo(ProfessionnelSante, { foreignKey: 'expediteur_id', as: 'expediteur' });
 
-// 26. Patient et Rappel (One-to-Many)
+// 32. Patient et Rappel (One-to-Many)
 Patient.hasMany(Rappel, { foreignKey: 'patient_id', as: 'rappels', onDelete: 'CASCADE' });
 Rappel.belongsTo(Patient, { foreignKey: 'patient_id', as: 'patient' });
 
-// --- Exportez sequelize et tous les modèles ---
+// 33. ProfessionnelSante et Rappel (One-to-Many) - rappels créés par le professionnel
+ProfessionnelSante.hasMany(Rappel, { foreignKey: 'createur_id', as: 'rappelsCrees', onDelete: 'SET NULL' });
+Rappel.belongsTo(ProfessionnelSante, { foreignKey: 'createur_id', as: 'createur' });
+
+// --- Exportez tous les modèles ---
 module.exports = {
   sequelize,
   Utilisateur,
@@ -185,9 +174,11 @@ module.exports = {
   AutorisationAcces,
   ServiceSante,
   Hopital,
-  // Nouveaux modèles DMP
   AutoMesure,
   DocumentPersonnel,
   Message,
   Rappel,
+  SessionAccesDMP,
+  TentativeAuthentificationCPS,
+  NotificationAccesDMP
 };

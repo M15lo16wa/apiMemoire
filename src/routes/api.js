@@ -12,6 +12,7 @@ const prescriptionRoutes = require('../modules/prescription/prescription.route')
 const examenLaboRoutes = require('../modules/examenLabo/examenLabo.route');
 const accessRoutes = require('../modules/access/access.route');
 const adminDMPRoutes = require('../modules/admin/adminDMP.route');
+const dmpAccessRoutes = require('../modules/dmpAccess/dmpAccess.route');
 
 const router = express.Router();
 
@@ -31,6 +32,9 @@ router.use('/examen-labo', examenLaboRoutes);
 
 // Routes d'administration DMP
 router.use('/admin/dmp', adminDMPRoutes);
+
+// Routes d'accès DMP pour les médecins
+router.use('/medecin/dmp', dmpAccessRoutes);
 
 // Route de déconnexion directe pour plus de commodité
 

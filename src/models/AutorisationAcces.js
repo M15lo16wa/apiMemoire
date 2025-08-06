@@ -8,52 +8,77 @@ module.exports = (sequelize) => {
       autoIncrement: true,
       allowNull: false,
     },
-    typeAcces: { 
+    type_acces: { 
       type: DataTypes.STRING(100),
       allowNull: false,
     },
-    dateDebut: {
-      type: DataTypes.DATEONLY,
+    date_debut: {
+      type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
-    dateFin: {
-      type: DataTypes.DATEONLY,
+    date_fin: {
+      type: DataTypes.DATE,
       allowNull: true, 
     },
     statut: { 
-      type: DataTypes.ENUM('Actif', 'Révoqué', 'Expiré'),
-      defaultValue: 'Actif',
+      type: DataTypes.ENUM('actif', 'inactif', 'attente_validation', 'refuse', 'expire'),
+      defaultValue: 'actif',
       allowNull: false,
     },
-    raison: {
+    raison_demande: {
       type: DataTypes.TEXT,
       allowNull: true,
     },
-    // Foreign keys added based on UML diagram analysis
-    patient_id: {
-      type: DataTypes.INTEGER,
+    conditions_acces: {
+      type: DataTypes.JSON,
       allowNull: true,
-      comment: 'ID du patient concerné par l\'autorisation'
     },
-    professionnel_id: {
-      type: DataTypes.INTEGER,
+    date_validation: {
+      type: DataTypes.DATE,
       allowNull: true,
-      comment: 'ID du professionnel demandant l\'accès'
     },
-    autorisateur_id: {
+    date_revocation: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    motif_revocation: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    notifications_envoyees: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+    },
+    accorde_par: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      comment: 'ID du professionnel qui autorise l\'accès'
+    },
+    validateur_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    createdBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
     historique_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      comment: 'ID de l\'historique d\'accès associé'
     },
-    // Le diagramme mentionne 'AccessAutorised()' comme méthode, pas attribut.
-    // Clé étrangère vers ProfessionnelSante (l'autorisateur) sera définie dans src/models/index.js
-    // Clé étrangère vers HistoriqueAccess (si relation one-to-one) sera définie dans src/models/index.js
+    // Colonnes pour la compatibilité avec l'ancien modèle
+    patient_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    professionnel_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    autorisateur_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
   }, {
     tableName: 'AutorisationsAcces',
     timestamps: true,
@@ -66,17 +91,17 @@ module.exports = (sequelize) => {
     const now = new Date();
     
     // Check if authorization is active
-    if (this.statut !== 'Actif') {
+    if (this.statut !== 'actif') {
       return false;
     }
     
     // Check if authorization has not expired
-    if (this.dateFin && now > this.dateFin) {
+    if (this.date_fin && now > this.date_fin) {
       return false;
     }
     
     // Check if authorization has started
-    if (this.dateDebut && now < this.dateDebut) {
+    if (this.date_debut && now < this.date_debut) {
       return false;
     }
     
@@ -86,11 +111,11 @@ module.exports = (sequelize) => {
   // donner() method from UML diagram
   AutorisationAcces.prototype.donner = async function(autorisateurId, duree = null) {
     this.autorisateur_id = autorisateurId;
-    this.statut = 'Actif';
-    this.dateDebut = new Date();
+    this.statut = 'actif';
+    this.date_debut = new Date();
     
     if (duree) {
-      this.dateFin = new Date(Date.now() + duree * 24 * 60 * 60 * 1000);
+      this.date_fin = new Date(Date.now() + duree * 24 * 60 * 60 * 1000);
     }
     
     await this.save();
@@ -107,15 +132,23 @@ module.exports = (sequelize) => {
   // Class method to create authorization
   AutorisationAcces.creerAutorisation = async function(autorisationData) {
     const autorisation = await this.create({
-      typeAcces: autorisationData.typeAcces,
-      dateDebut: autorisationData.dateDebut || new Date(),
-      dateFin: autorisationData.dateFin || null,
-      statut: autorisationData.statut || 'Actif',
-      raison: autorisationData.raison,
+      type_acces: autorisationData.type_acces,
+      date_debut: autorisationData.date_debut || new Date(),
+      date_fin: autorisationData.date_fin || null,
+      statut: autorisationData.statut || 'actif',
+      raison_demande: autorisationData.raison_demande,
+      conditions_acces: autorisationData.conditions_acces,
+      date_validation: autorisationData.date_validation,
+      date_revocation: autorisationData.date_revocation,
+      motif_revocation: autorisationData.motif_revocation,
+      notifications_envoyees: autorisationData.notifications_envoyees,
+      accorde_par: autorisationData.accorde_par,
+      validateur_id: autorisationData.validateur_id,
+      createdBy: autorisationData.createdBy,
+      historique_id: autorisationData.historique_id,
       patient_id: autorisationData.patient_id,
       professionnel_id: autorisationData.professionnel_id,
-      autorisateur_id: autorisationData.autorisateur_id,
-      historique_id: autorisationData.historique_id
+      autorisateur_id: autorisationData.autorisateur_id
     });
     
     return autorisation;

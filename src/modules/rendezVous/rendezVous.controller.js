@@ -14,9 +14,9 @@ exports.createRendezVous = catchAsync(async (req, res, next) => {
   const rendezVousData = { ...req.body };
   
   // Gérer les différentes variantes de noms de champs
-  if (rendezVousData.DateHeure) {
-    rendezVousData.date_heure = rendezVousData.DateHeure;
-    delete rendezVousData.DateHeure;
+  if (rendezVousData.date_heure) {
+    rendezVousData.DateHeure = rendezVousData.date_heure;
+    delete rendezVousData.date_heure;
   }
   
   if (rendezVousData.motif_consultation) {
@@ -25,7 +25,7 @@ exports.createRendezVous = catchAsync(async (req, res, next) => {
   }
   
   // Valider les données requises pour le rendez-vous
-  if (!rendezVousData.date_heure || !rendezVousData.motif || !rendezVousData.service_id) {
+  if (!rendezVousData.DateHeure || !rendezVousData.motif_consultation || !rendezVousData.service_id) {
     return next(new AppError('Veuillez fournir la date/heure, le motif et le service pour le rendez-vous', 400));
   }
   

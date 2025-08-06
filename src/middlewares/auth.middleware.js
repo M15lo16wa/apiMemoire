@@ -30,6 +30,7 @@ exports.protect = catchAsync(async (req, res, next) => {
   let decoded;
   try {
     decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+    console.log('🔍 Token décodé:', decoded);
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
       return next(new AppError('Invalid token. Please log in again.', 401));
@@ -41,9 +42,37 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
 
   // 4) Gestion fine selon le contenu du token
-  const { ProfessionnelSante, Utilisateur } = require('../models');
+  const { ProfessionnelSante, Utilisateur, Patient } = require('../models');
   const professionnelId = decoded.professionnel_id || decoded.id_professionnel;
-  if (professionnelId && decoded.professionnel_id) {
+  console.log('🔍 Token décodé:', decoded);
+  console.log('🔍 Professionnel ID recherché:', professionnelId);
+  console.log('🔍 Rôle dans le token:', decoded.role);
+
+  // Vérifier si c'est un token patient
+  if (decoded.role === 'patient' && decoded.id) {
+    console.log('🔍 Token patient détecté, ID:', decoded.id);
+    const patient = await Patient.findByPk(decoded.id);
+    if (!patient) {
+      return next(new AppError('Le patient lié à ce token n\'existe plus.', 401));
+    }
+    if (patient.acces_dmp === false) {
+      return next(new AppError('Votre accès au DMP a été révoqué.', 403));
+    }
+    console.log('✅ Patient trouvé:', {
+      id: patient.id_patient,
+      nom: patient.nom,
+      prenom: patient.prenom,
+      acces_dmp: patient.acces_dmp
+    });
+    req.user = {
+      role: 'patient',
+      id_patient: patient.id_patient,
+      ...patient.toJSON()
+    };
+    req.patient = patient;
+    res.locals.user = req.user;
+    return next();
+  } else if (professionnelId && decoded.professionnel_id) {
     // Cas professionnel de santé (clé compatible)
     const professionnel = await ProfessionnelSante.findByPk(professionnelId);
     if (!professionnel) {
@@ -52,6 +81,13 @@ exports.protect = catchAsync(async (req, res, next) => {
     if (professionnel.statut !== 'actif') {
       return next(new AppError('Votre compte professionnel n\'est pas actif.', 401));
     }
+    console.log('🔍 Professionnel trouvé:', {
+      id: professionnel.id_professionnel,
+      nom: professionnel.nom,
+      prenom: professionnel.prenom,
+      role: professionnel.role,
+      statut: professionnel.statut
+    });
     req.user = professionnel;
     req.professionnel = professionnel;
     res.locals.user = professionnel;
@@ -84,7 +120,26 @@ exports.restrictTo = (...roles) => {
       return next(new AppError('Authentication required', 401));
     }
     
-    if (!roles.includes(req.user.role)) {
+    console.log('🔍 Vérification des rôles:');
+    console.log('📋 Rôles requis:', roles);
+    console.log('📋 Utilisateur:', {
+      id: req.user.id_professionnel || req.user.id,
+      role: req.user.role,
+      role_utilisateur: req.user.role_utilisateur
+    });
+    
+    // Vérifier si l'utilisateur a un rôle
+    const userRole = req.user.role || req.user.role_utilisateur;
+    if (!userRole) {
+      console.log('❌ Aucun rôle défini pour l\'utilisateur');
+      return next(new AppError('User role not defined', 403));
+    }
+    
+    console.log('📋 Rôle de l\'utilisateur:', userRole);
+    console.log('📋 Rôles autorisés:', roles);
+    console.log('📋 Accès autorisé:', roles.includes(userRole));
+    
+    if (!roles.includes(userRole)) {
       return next(new AppError('You do not have permission to perform this action', 403));
     }
     next();

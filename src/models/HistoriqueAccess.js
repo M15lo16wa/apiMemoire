@@ -57,10 +57,10 @@ module.exports = (sequelize) => {
       allowNull: true,
     },
     // Foreign keys
-    professionnel_id: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-    },
+    // professionnel_id: {
+    //   type: DataTypes.INTEGER,
+    //   allowNull: true,
+    // },
     id_utilisateur: {
       type: DataTypes.INTEGER,
       allowNull: true,

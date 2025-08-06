@@ -9,25 +9,15 @@ module.exports = (sequelize) => {
       allowNull: false,
       comment: 'Identifiant unique du rendez-vous'
     },
-    date_heure: {
+    DateHeure: {
       type: DataTypes.DATE,
       allowNull: false,
       comment: 'Date et heure du rendez-vous'
     },
-    date_heure_fin: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      comment: 'Date et heure de fin du rendez-vous'
-    },
-    motif: {
+    motif_consultation: {
       type: DataTypes.STRING(255),
       allowNull: false,
       comment: 'Motif de la consultation'
-    },
-    description: {
-      type: DataTypes.TEXT,
-      allowNull: true,
-      comment: 'Description détaillée de la consultation'
     },
     statut: {
       type: DataTypes.ENUM('planifie', 'confirme', 'en_attente', 'en_cours', 'termine', 'annule', 'reporte'),
@@ -35,63 +25,76 @@ module.exports = (sequelize) => {
       allowNull: false,
       comment: 'Statut du rendez-vous'
     },
-    type_rendezvous: {
-      type: DataTypes.ENUM('consultation', 'controle', 'urgence', 'bilan', 'autre'),
-      defaultValue: 'consultation',
-      allowNull: false,
-      comment: 'Type de rendez-vous'
-    },
-    duree: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 30,
-      comment: 'Durée prévue en minutes'
-    },
-    rappel_envoye: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-      comment: 'Indique si un rappel a été envoyé'
-    },
-    date_rappel: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      comment: 'Date à laquelle le rappel a été envoyé'
-    },
-    patient_id: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      comment: 'ID du patient concerné'
-    },
-    id_professionnel: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      comment: 'ID du professionnel de santé assigné'
-    },
     service_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'ID du service concerné'
-    },
-    salle_id: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      comment: 'ID de la salle affectée'
     },
     notes: {
       type: DataTypes.TEXT,
       allowNull: true,
       comment: 'Notes complémentaires sur le rendez-vous'
     },
-    date_annulation: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      comment: 'Date à laquelle le rendez-vous a été annulé'
-    },
-    motif_annulation: {
+    nom: {
       type: DataTypes.STRING(255),
-      allowNull: true,
-      comment: 'Raison de l\'annulation du rendez-vous'
+      allowNull: false,
+      comment: 'Nom du patient'
     },
+    prenom: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      comment: 'Prénom du patient'
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      comment: 'Email du patient'
+    },
+    dateNaissance: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      comment: 'Date de naissance du patient'
+    },
+    sexe: {
+      type: DataTypes.ENUM('M', 'F'),
+      allowNull: false,
+      comment: 'Sexe du patient'
+    },
+    telephone: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      comment: 'Téléphone du patient'
+    },
+    id_hopital: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment: 'ID de l\'hôpital'
+    },
+    id_service: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      comment: 'ID du service'
+    },
+    id_professionnel: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'ID du professionnel de santé assigné'
+    },
+    numero_assure: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      comment: 'Numéro d\'assuré'
+    },
+    assureur: {
+      type: DataTypes.STRING(100),
+      allowNull: false,
+      comment: 'Nom de l\'assureur'
+    },
+    professionnel_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'ID du professionnel (alias)'
+    }
   }, {
     tableName: 'RendezVous',
     timestamps: true,

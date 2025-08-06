@@ -9,6 +9,58 @@ router.use(patientAuth);
 
 /**
  * @swagger
+ * /patient/dmp:
+ *   get:
+ *     summary: Récupère les informations générales du DMP du patient
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Informations DMP récupérées avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     dmp:
+ *                       type: object
+ *                       properties:
+ *                         patient_id:
+ *                           type: integer
+ *                         nom:
+ *                           type: string
+ *                         prenom:
+ *                           type: string
+ *                         date_naissance:
+ *                           type: string
+ *                           format: date
+ *                         groupe_sanguin:
+ *                           type: string
+ *                         derniere_activite:
+ *                           type: string
+ *                           format: date-time
+ *                         total_documents:
+ *                           type: integer
+ *                         total_consultations:
+ *                           type: integer
+ *                         total_prescriptions:
+ *                           type: integer
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.get('/', DMPController.getDMPOverview);
+
+/**
+ * @swagger
  * /patient/dmp/tableau-de-bord:
  *   get:
  *     summary: Récupère le tableau de bord personnalisé du patient
@@ -198,6 +250,49 @@ router.get('/journal-activite', DMPController.getJournalActivite);
  *         description: Accès refusé
  */
 router.get('/droits-acces', DMPController.getDroitsAcces);
+
+/**
+ * @swagger
+ * /patient/dmp/droits-acces/notifications:
+ *   get:
+ *     summary: Récupère les notifications d'accès DMP du patient
+ *     tags: [DMP - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Nombre de notifications à récupérer
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: Offset pour la pagination
+ *       - in: query
+ *         name: type_notification
+ *         schema:
+ *           type: string
+ *           enum: [demande_validation, information_acces, alerte_securite]
+ *         description: Filtrer par type de notification
+ *       - in: query
+ *         name: statut_envoi
+ *         schema:
+ *           type: string
+ *           enum: [en_attente, envoyee, livree, echouee]
+ *         description: Filtrer par statut d'envoi
+ *     responses:
+ *       200:
+ *         description: Notifications récupérées avec succès
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès refusé
+ */
+router.get('/droits-acces/notifications', DMPController.getNotificationsAccesDMP);
 
 /**
  * @swagger
