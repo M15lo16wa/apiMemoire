@@ -1,6 +1,8 @@
 const patientService = require('./patient.service');
 const patientAuthService = require('./patient.auth.service');
 const catchAsync = require('../../utils/catchAsync');
+const accessService = require('../access/access.service');
+
 const AppError = require('../../utils/appError');
 
 exports.getAllPatients = catchAsync(async (req, res, next) => {
@@ -128,4 +130,81 @@ exports.getMe = catchAsync(async (req, res, next) => {
       patient: req.patient
     }
   });
+});
+
+// === CONTRÔLEURS POUR LA GESTION DES NOTIFICATIONS ET ACCÈS ===
+
+/**
+ * Récupère les demandes d'accès en attente pour le patient connecté.
+ */
+exports.getPendingAccessRequests = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient; // 'req.patient' vient du middleware 'patientAuth'
+
+    // On doit appeler le service qui gère la logique d'accès
+    const accessService = require('../access/access.service');
+    const pendingRequests = await accessService.getPendingRequests(patientId);
+
+    res.status(200).json({
+        status: 'success',
+        results: pendingRequests.length,
+        data: {
+            // Le front-end s'attend à un champ 'notifications'
+            notifications: pendingRequests
+        }
+    });
+});
+
+/**
+ * Répond à une demande d'accès.
+ */
+exports.respondToAccessRequest = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const { authorizationId } = req.params;
+    const { response, comment } = req.body; // 'accept' ou 'refuse'
+
+    const accessService = require('../access/access.service');
+
+    // On vérifie que le patient a le droit de répondre à CETTE demande spécifique
+    const autorisation = await accessService.processPatientResponse(authorizationId, patientId, response, comment);
+
+    res.status(200).json({
+        status: 'success',
+        message: `Demande ${response === 'accept' ? 'acceptée' : 'refusée'}`,
+        data: { autorisation }
+    });
+});
+
+/**
+ * Marque une notification comme lue.
+ */
+exports.marquerNotificationLue = catchAsync(async (req, res, next) => {
+    const patientId = req.patient.id_patient;
+    const { notificationId } = req.params;
+
+    // Le service d'accès gère aussi les notifications liées à l'accès
+    const accessService = require('../access/access.service');
+    await accessService.marquerNotificationCommeLue(notificationId, patientId);
+
+    res.status(200).json({
+        status: 'success',
+        message: 'Notification marquée comme lue'
+    });
+});
+
+/**
+ * Marque une notification spécifique comme lue.
+ */
+exports.marquerNotificationLue = catchAsync(async (req, res, next) => {
+    // 1. On récupère les informations de la requête
+    const patientId = req.patient.id_patient; // Vient du middleware `patientAuth`
+    const { notificationId } = req.params;   // Vient de l'URL (ex: /notifications/123/mark-as-read)
+
+    // 2. On appelle le service que vous venez de créer
+    await accessService.marquerNotificationCommeLue(notificationId, patientId);
+
+    // 3. On envoie une réponse de succès
+    res.status(200).json({
+        status: 'success',
+        message: 'Notification marquée comme lue.'
+    });
 });

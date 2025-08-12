@@ -2,7 +2,6 @@ const express = require('express');
 const patientController = require('./patient.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
 const patientAuth = require('../../middlewares/patientAuth');
-const dmpRoutes = require('./dmp.route');
 
 const router = express.Router();
 
@@ -370,7 +369,58 @@ router.get('/auth/me', patientAuth, patientController.getMe);
  */
 router.post('/auth/change-password', patientAuth, patientController.changePassword);
 
-// Routes DMP (Dossier Médical Partagé)
-router.use('/dmp', dmpRoutes);
+/**
+ * @swagger
+ * /patient/notifications/{notificationId}/mark-as-read:
+ *   patch:
+ *     summary: Marquer une notification comme lue
+ *     tags: [Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: notificationId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la notification à marquer comme lue
+ *     responses:
+ *       200:
+ *         description: Notification marquée comme lue avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Notification marquée comme lue"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     notification:
+ *                       type: object
+ *                       properties:
+ *                         id_notification:
+ *                           type: integer
+ *                         statut:
+ *                           type: string
+ *                           example: "lue"
+ *                         date_lecture:
+ *                           type: string
+ *                           format: date-time
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non authentifié
+ *       403:
+ *         description: Accès non autorisé
+ *       404:
+ *         description: Notification non trouvée
+ */
+router.patch('/notifications/:notificationId/mark-as-read', patientController.marquerNotificationLue);
 
 module.exports = router;

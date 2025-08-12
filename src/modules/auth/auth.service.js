@@ -1,4 +1,5 @@
-const { Utilisateur } = require('../../models');
+const { Utilisateur, ProfessionnelSante,  HistoriqueAccess } = require('../../models');
+const { Op } = require('sequelize');
 
 const AppError = require('../../utils/appError');
 const jwt = require('jsonwebtoken');
@@ -89,3 +90,86 @@ exports.login = async (email, mot_de_passe) => {
 };
 
 exports.sendAuthToken = createSendToken;
+
+// =================================================================
+// === AUTHENTIFICATION SPÉCIFIQUE POUR LES PROFESSIONNELS DE SANTÉ ===
+// =================================================================
+
+/**
+ * Authenticate a professional with their public identifier and their secret CPS code.
+ * @param {string} publicIdentifier - The professional's public ID (e.g., email or numero_adeli).
+ * @param {string} cpsCode - The 4-digit secret CPS code.
+ * @returns {Object} The authenticated professional's data.
+ */
+exports.authenticateCPS = async (cpsCode) => {
+  // 1. Validation des entrées
+  if (!cpsCode) {
+    throw new AppError('Un code CPS est requis.', 400);
+  }
+  if (!/^\d{4}$/.test(cpsCode)) {
+    throw new AppError('Code CPS invalide. Il doit contenir 4 chiffres.', 400);
+  }
+
+  // 2. Retrouver tous les professionnels actifs avec un code CPS
+  const professionnels = await ProfessionnelSante.scope('withPassword').findAll({
+    where: {
+      statut: 'actif',
+      code_cps: {
+        [Op.ne]: null // Code CPS non null
+      }
+    }
+  });
+
+  // 3. Vérifier le code CPS pour chaque professionnel
+  let professionnelAuthentifie = null;
+  
+  for (const professionnel of professionnels) {
+    if (professionnel.code_cps) {
+      const isMatch = await bcrypt.compare(cpsCode, professionnel.code_cps);
+      if (isMatch) {
+        professionnelAuthentifie = professionnel;
+        break;
+      }
+    }
+  }
+
+  if (!professionnelAuthentifie) {
+    // Ne pas donner d'info précise si l'utilisateur n'existe pas ou n'a pas de code CPS
+    throw new AppError('Identifiant ou code CPS invalide.', 401);
+  }
+
+  // 4. Loguer la tentative réussie dans l'historique
+  try {
+    await HistoriqueAccess.create({
+      action: 'authentification_cps_reussie',
+      statut: 'SUCCES',
+      professionnel_id: professionnelAuthentifie.id_professionnel,
+      details: `Authentification par code CPS réussie pour ${professionnelAuthentifie.nom} ${professionnelAuthentifie.prenom}.`
+    });
+  } catch (error) {
+    // Si l'historique échoue, on continue quand même
+    console.warn('Erreur lors de la création de l\'historique:', error.message);
+  }
+  
+  // On ne retourne pas le code CPS hashé
+  professionnelAuthentifie.code_cps = undefined; 
+  return professionnelAuthentifie;
+};
+
+
+/**
+ * Generate a specific access token for a professional after successful authentication.
+ * @param {Object} professionnel - Professional data from the database.
+ * @returns {string} JWT token.
+ */
+exports.generateAccessToken = (professionnel) => {
+  return jwt.sign(
+    { 
+      id: professionnel.id_professionnel,
+      role: professionnel.role, // ex: 'medecin'
+      type: 'professionnel' // Indique que c'est un token de session pour un professionnel
+    }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: '8h' } // Une session de 8 heures
+  );
+};

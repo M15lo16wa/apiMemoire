@@ -7,7 +7,7 @@ const AppError = require('../../utils/appError');
  * Create a new authorization access
  */
 exports.createAuthorizationAccess = catchAsync(async (req, res, next) => {
-  const { typeAcces, dateDebut, dateFin, statut, raison, patient_id, professionnel_id } = req.body;
+  const { typeAcces, date_debut, date_fin, statut, raison, patient_id, professionnel_id } = req.body;
 
   if (!typeAcces || !patient_id || !professionnel_id) {
     return next(new AppError('Type d\'accès, ID patient et ID professionnel sont requis', 400));
@@ -15,8 +15,8 @@ exports.createAuthorizationAccess = catchAsync(async (req, res, next) => {
 
   const newAuthAccess = await accessService.createAuthorizationAccess({
     typeAcces,
-    dateDebut: dateDebut || new Date(),
-    dateFin,
+    date_debut: date_debut || new Date(),
+    date_fin,
     statut: statut || 'Actif',
     raison,
     patient_id,
@@ -210,13 +210,16 @@ exports.revokeAuthorizationAccess = catchAsync(async (req, res, next) => {
 exports.checkAccess = catchAsync(async (req, res, next) => {
   const { professionnelId, patientId, typeAcces } = req.params;
   
-  const hasAccess = await accessService.checkAccess(professionnelId, patientId, typeAcces);
+  // Utiliser la fonction avec 2 paramètres comme définie dans le service
+  const accessResult = await accessService.checkAccess(professionnelId, patientId);
   
   res.status(200).json({
     status: 'success',
     data: {
-      hasAccess: hasAccess,
-      message: hasAccess ? 'Accès autorisé' : 'Accès refusé'
+      hasAccess: accessResult.accessStatus === 'active',
+      accessStatus: accessResult.accessStatus,
+      authorization: accessResult.authorization,
+      message: accessResult.accessStatus === 'active' ? 'Accès autorisé' : 'Accès refusé'
     },
   });
 });
@@ -243,3 +246,369 @@ exports.logAccess = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+/**
+ * Request standard access to patient medical record
+ */
+exports.requestStandardAccess = catchAsync(async (req, res, next) => {
+  const { patient_id, raison_demande } = req.body;
+  const professionnel_id = req.user.id;
+
+  console.log('➡️ [requestStandardAccess] Entrée', {
+    professionnel_id,
+    role: req.user?.role,
+    body: { patient_id, raison_demande }
+  });
+
+  if (!patient_id) {
+    return next(new AppError('ID patient requis', 400));
+  }
+
+  try {
+    const autorisation = await accessService.requestStandardAccess({
+      professionnel_id,
+      patient_id,
+      raison_demande
+    });
+
+    console.log('✅ [requestStandardAccess] Autorisation créée', {
+      id_acces: autorisation?.id_acces,
+      statut: autorisation?.statut
+    });
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Demande d\'accès envoyée avec succès',
+      data: {
+        autorisation
+      }
+    });
+  } catch (error) {
+    console.error('❌ [requestStandardAccess] Erreur', {
+      name: error.name,
+      message: error.message,
+      errors: error.errors,
+      stack: error.stack
+    });
+    return next(error);
+  }
+});
+
+/**
+ * Grant emergency access to patient medical record
+ */
+exports.grantEmergencyAccess = catchAsync(async (req, res, next) => {
+  const { patient_id, justification_urgence } = req.body;
+  const professionnel_id = req.user.id;
+
+  if (!patient_id || !justification_urgence) {
+    return next(new AppError('ID patient et justification d\'urgence requis', 400));
+  }
+
+  const result = await accessService.grantEmergencyAccess({
+    professionnel_id,
+    patient_id,
+    justification_urgence
+  });
+
+  res.status(201).json({
+    status: 'success',
+    message: 'Accès d\'urgence accordé',
+    data: {
+      autorisation: result.autorisation,
+      dmp_token: result.dmp_token,
+      expires_in: result.expires_in
+    }
+  });
+});
+
+/**
+ * Grant secret access to patient medical record
+ */
+exports.grantSecretAccess = catchAsync(async (req, res, next) => {
+  const { patient_id, raison_secrete } = req.body;
+  const professionnel_id = req.user.id;
+
+  if (!patient_id) {
+    return next(new AppError('ID patient requis', 400));
+  }
+
+  const result = await accessService.grantSecretAccess({
+    professionnel_id,
+    patient_id,
+    raison_secrete
+  });
+
+  res.status(201).json({
+    status: 'success',
+    message: 'Accès secret accordé',
+    data: {
+      autorisation: result.autorisation,
+      dmp_token: result.dmp_token,
+      expires_in: result.expires_in
+    }
+  });
+});
+
+/**
+ * Process patient response to access request (patient endpoint)
+ */
+exports.processPatientResponse = catchAsync(async (req, res, next) => {
+  const { authorizationId } = req.params;
+  const { response, comment } = req.body;
+  const patientId = req.patient.id_patient;
+
+  if (!response || !['accept', 'refuse'].includes(response)) {
+    return next(new AppError('Réponse invalide. Doit être "accept" ou "refuse"', 400));
+  }
+
+  // Verify that the authorization belongs to this patient
+  const { AutorisationAcces } = require('../../models');
+  const autorisation = await AutorisationAcces.findOne({
+    where: {
+      id_acces: authorizationId,
+      patient_id: patientId,
+      statut: 'attente_validation'
+    }
+  });
+
+  if (!autorisation) {
+    return next(new AppError('Demande d\'autorisation non trouvée ou déjà traitée', 404));
+  }
+
+  const result = await accessService.processPatientResponse(authorizationId, patientId, response, comment);
+
+  const responseData = {
+    autorisation: result.autorisation
+  };
+
+  // Include DMP token if access was accepted
+  if (response === 'accept' && result.dmp_token) {
+    responseData.dmp_token = result.dmp_token;
+    responseData.expires_in = result.expires_in;
+  }
+
+  res.status(200).json({
+    status: 'success',
+    message: `Demande ${response === 'accept' ? 'acceptée' : 'refusée'} avec succès`,
+    data: responseData
+  });
+});
+
+/**
+ * Generate DMP access token for existing authorization
+ */
+exports.generateDMPAccessToken = catchAsync(async (req, res, next) => {
+  const { authorizationId } = req.params;
+  const professionnel_id = req.user.id;
+
+  // Verify that the authorization belongs to this professional
+  const autorisation = await AutorisationAcces.findOne({
+    where: {
+      id_acces: authorizationId,
+      professionnel_id,
+      statut: 'actif'
+    }
+  });
+
+  if (!autorisation) {
+    return next(new AppError('Autorisation non trouvée ou non active', 404));
+  }
+
+  const result = await accessService.generateDMPAccessToken(authorizationId);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Token DMP généré avec succès',
+    data: {
+      dmp_token: result.dmp_token,
+      expires_in: result.expires_in,
+      autorisation: result.autorisation
+    }
+  });
+});
+
+/**
+ * Get pending access requests for a patient (patient endpoint)
+ */
+exports.getPatientPendingRequests = catchAsync(async (req, res, next) => {
+  const patientId = req.patient.id_patient;
+
+  const pendingRequests = await accessService.getPendingRequests(patientId);
+
+  res.status(200).json({
+    status: 'success',
+    results: pendingRequests.length,
+    data: {
+      pendingRequests
+    }
+  });
+});
+
+/**
+ * Get access history for a professional
+ */
+exports.getProfessionalAccessHistory = catchAsync(async (req, res, next) => {
+  const professionnel_id = req.user.id;
+
+  const history = await HistoriqueAccess.findAll({
+    where: { professionnel_id },
+    order: [['date_heure_acces', 'DESC']],
+    limit: 50
+  });
+
+  res.status(200).json({
+    status: 'success',
+    results: history.length,
+    data: {
+      history
+    }
+  });
+});
+
+/**
+ * Get access history for a patient (patient endpoint)
+ */
+exports.getPatientAccessHistory = catchAsync(async (req, res, next) => {
+  const patientId = req.patient.id_patient;
+
+  const { HistoriqueAccess } = require('../../models');
+  const history = await HistoriqueAccess.findAll({
+    where: { id_patient: patientId },
+    order: [['date_heure_acces', 'DESC']],
+    limit: 50
+  });
+
+  res.status(200).json({
+    status: 'success',
+    results: history.length,
+    data: {
+      history
+    }
+  });
+});
+
+/**
+ * Get active authorizations for a patient (patient endpoint)
+ */
+exports.getPatientActiveAuthorizations = catchAsync(async (req, res, next) => {
+  console.log('--- [1] Entrée dans le contrôleur "getPatientActiveAuthorizations" ---');
+  const patientId = req.patient.id_patient;
+  console.log(`--- [2] ID du patient récupéré: ${patientId}`);
+
+  try {
+    const { AutorisationAcces } = require('../../models');
+    const authorizations = await AutorisationAcces.findAll({
+      where: { 
+        patient_id: patientId,
+        statut: 'actif'
+      },
+      include: [
+        {
+          model: require('../../models').ProfessionnelSante,
+          as: 'professionnelDemandeur',
+          attributes: ['id_professionnel', 'nom', 'prenom', 'specialite', 'role']
+        }
+      ],
+      order: [['date_debut', 'DESC']]
+    });
+
+    console.log(`--- [4] Requête findAll terminée. Résultats: ${authorizations.length}`);
+
+    res.status(200).json({
+      status: 'success',
+      results: authorizations.length,
+      data: {
+        authorizations
+      }
+    });
+  } catch (error) {
+    console.error('❌ [getPatientActiveAuthorizations] Erreur lors du chargement des autorisations actives', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
+    return next(error);
+  }
+});
+
+/**
+ * Get access status for a patient
+ */
+exports.getAccessStatusForPatient = catchAsync(async (req, res, next) => {
+    const { patientId } = req.params;
+    
+    // Validation du paramètre patientId
+    if (!patientId || patientId === 'undefined') {
+        return next(new AppError('ID du patient requis et valide', 400));
+    }
+    
+    // Validation que patientId est un nombre valide
+    const patientIdNum = parseInt(patientId, 10);
+    if (isNaN(patientIdNum) || patientIdNum <= 0) {
+        return next(new AppError('ID du patient doit être un nombre valide', 400));
+    }
+    
+    // Déterminer l'ID du professionnel selon le contexte
+    let professionnelId = req.user.id_professionnel || req.user.id;
+
+    // Si l'appel est fait avec un token patient, on tente de lire un professionnelId en query
+    if (req.user.role === 'patient') {
+        professionnelId = req.query.professionnelId || null;
+    }
+
+    if (!professionnelId) {
+        return next(new AppError("Endpoint réservé aux professionnels ou 'professionnelId' manquant pour la vérification.", 403));
+    }
+
+    try {
+        const status = await accessService.checkExistingAuthorization(professionnelId, patientIdNum);
+        
+        res.status(200).json({
+            status: 'success',
+            data: {
+                status: status
+            }
+        });
+    } catch (error) {
+        console.error('❌ [getAccessStatusForPatient] Erreur lors de la vérification du statut:', {
+            patientId: patientIdNum,
+            professionnelId,
+            error: error.message
+        });
+        return next(error);
+    }
+});
+
+
+/**
+ * Get active authorizations for a professional
+ */
+exports.getProfessionalActiveAuthorizations = catchAsync(async (req, res, next) => {
+  const professionnel_id = req.user.id;
+
+  const { AutorisationAcces } = require('../../models');
+  const authorizations = await AutorisationAcces.findAll({
+    where: { 
+      professionnel_id,
+      statut: 'actif'
+    },
+    include: [
+      {
+        model: require('../../models').Patient,
+        attributes: ['id_patient', 'nom', 'prenom', 'numero_assure']
+      }
+    ],
+    order: [['date_debut', 'DESC']]
+  });
+
+  res.status(200).json({
+    status: 'success',
+    results: authorizations.length,
+    data: {
+      authorizations
+    }
+  });
+});
+
+

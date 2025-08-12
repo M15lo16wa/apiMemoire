@@ -2,7 +2,7 @@ const dotenv = require('dotenv');
 dotenv.config({ path: './.env' });
 
 const app = require('./app');
-const sequelize = require('./config/database');
+const { sequelize } = require('./config/database');
 
 const PORT = process.env.PORT || 3000;
 
@@ -17,12 +17,12 @@ process.on('uncaughtException', err => {
 const startServer = async () => {
     try {
         await sequelize.authenticate();
-    console.log('Connection to database has been established successfully.');
+        console.log('Connection to database has been established successfully.');
 
-    app.listen(PORT, () => {
-        console.log(`Server running on port: http://localhost:${PORT} in ${process.env.NODE_ENV} mode`);
-    });
-    }catch (error) {
+        app.listen(PORT, () => {
+            console.log(`Server running on port: http://localhost:${PORT} in ${process.env.NODE_ENV} mode`);
+        });
+    } catch (error) {
         console.error('Unable to connect to the database:', error);
         process.exit(1);
     }

@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
-const { Utilisateur } = require('../models');
+
 
 // Middleware pour protéger les routes (vérifie si l'utilisateur est connecté)
 exports.protect = catchAsync(async (req, res, next) => {
@@ -43,38 +43,39 @@ exports.protect = catchAsync(async (req, res, next) => {
 
   // 4) Gestion fine selon le contenu du token
   const { ProfessionnelSante, Utilisateur, Patient } = require('../models');
-  const professionnelId = decoded.professionnel_id || decoded.id_professionnel;
-  console.log('🔍 Token décodé:', decoded);
-  console.log('🔍 Professionnel ID recherché:', professionnelId);
-  console.log('🔍 Rôle dans le token:', decoded.role);
+  // Inclure toutes les variantes possibles d'ID professionnel issues du payload
+  const professionnelIdFromPayload = decoded.professionnel_id || decoded.id_professionnel || (decoded.type === 'professionnel' ? decoded.id : null);
+  console.log('🔍 Professionnel ID extrait du token:', professionnelIdFromPayload);
+  console.log('🔍 Rôle dans le token:', decoded.role, '| type:', decoded.type);
 
   // Vérifier si c'est un token patient
   if (decoded.role === 'patient' && decoded.id) {
     console.log('🔍 Token patient détecté, ID:', decoded.id);
     const patient = await Patient.findByPk(decoded.id);
     if (!patient) {
+      console.warn('❌ Token patient valide mais patient introuvable en BD');
       return next(new AppError('Le patient lié à ce token n\'existe plus.', 401));
-    }
-    if (patient.acces_dmp === false) {
-      return next(new AppError('Votre accès au DMP a été révoqué.', 403));
     }
     console.log('✅ Patient trouvé:', {
       id: patient.id_patient,
       nom: patient.nom,
-      prenom: patient.prenom,
-      acces_dmp: patient.acces_dmp
+      prenom: patient.prenom
     });
     req.user = {
       role: 'patient',
+      type: 'patient',
+      id: patient.id_patient,
       id_patient: patient.id_patient,
       ...patient.toJSON()
     };
     req.patient = patient;
     res.locals.user = req.user;
     return next();
-  } else if (professionnelId && decoded.professionnel_id) {
-    // Cas professionnel de santé (clé compatible)
-    const professionnel = await ProfessionnelSante.findByPk(professionnelId);
+  }
+
+  // Cas professionnel de santé
+  if (professionnelIdFromPayload) {
+    const professionnel = await ProfessionnelSante.findByPk(professionnelIdFromPayload);
     if (!professionnel) {
       return next(new AppError('Le professionnel de santé lié à ce token n\'existe plus.', 401));
     }
@@ -88,12 +89,22 @@ exports.protect = catchAsync(async (req, res, next) => {
       role: professionnel.role,
       statut: professionnel.statut
     });
-    req.user = professionnel;
+
+    // Important: exposer un champ "id" unifié pour les contrôleurs
+    const professionnelJson = professionnel.toJSON();
+    req.user = {
+      ...professionnelJson,
+      id: professionnelJson.id_professionnel,
+      id_professionnel: professionnelJson.id_professionnel,
+      role: professionnelJson.role || decoded.role || 'medecin'
+    };
     req.professionnel = professionnel;
-    res.locals.user = professionnel;
+    res.locals.user = req.user;
     return next();
-  } else if (decoded.id) {
-    // Cas utilisateur classique
+  }
+
+  // Cas utilisateur classique (admin/staff)
+  if (decoded.id) {
     const currentUser = await Utilisateur.findByPk(decoded.id);
     if (!currentUser) {
       return next(new AppError('The user belonging to this token no longer exists.', 401));
@@ -101,12 +112,14 @@ exports.protect = catchAsync(async (req, res, next) => {
     if (currentUser.statut !== 'actif') {
       return next(new AppError('Your account is not active. Please contact an administrator.', 401));
     }
-    req.user = currentUser;
-    res.locals.user = currentUser;
+    // Exposer un id unifié pour cohérence
+    const userJson = currentUser.toJSON();
+    req.user = { ...userJson, id: userJson.id_utilisateur };
+    res.locals.user = req.user;
     return next();
-  } else {
-    return next(new AppError('Token invalide ou incomplet.', 401));
   }
+
+  return next(new AppError('Token invalide ou incomplet.', 401));
 });
 
 // Alias pour authenticateToken (compatibilité avec les modules existants)
@@ -123,7 +136,7 @@ exports.restrictTo = (...roles) => {
     console.log('🔍 Vérification des rôles:');
     console.log('📋 Rôles requis:', roles);
     console.log('📋 Utilisateur:', {
-      id: req.user.id_professionnel || req.user.id,
+      id: req.user.id || req.user.id_professionnel || req.user.id_utilisateur,
       role: req.user.role,
       role_utilisateur: req.user.role_utilisateur
     });

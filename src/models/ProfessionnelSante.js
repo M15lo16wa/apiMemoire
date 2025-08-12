@@ -123,6 +123,11 @@ module.exports = (sequelize) => {
         len: [6, 20]
       }
     },
+    code_cps: {
+      type: DataTypes.STRING, // On utilise STRING pour pouvoir hasher
+      allowNull: true,       // Mettre à `false` si tous les professionnels DOIVENT en avoir un
+      comment: "Code CPS à 4 chiffres, hashé pour l'authentification"
+    },
     mot_de_passe: {
       type: DataTypes.STRING(255),
       allowNull: true,

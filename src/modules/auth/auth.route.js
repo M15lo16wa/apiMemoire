@@ -4,6 +4,225 @@ const authMiddleware = require('../../middlewares/auth.middleware');
 
 const router = express.Router();
 
+// CPS Authentication routes
+
+/**
+ * @swagger
+ * /auth/cps/login:
+ *   post:
+ *     summary: Authentification CPS pour professionnels de santé
+ *     tags: [Auth - CPS]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - cpsCode
+ *             properties:
+ *               cpsCode:
+ *                 type: string
+ *                 minLength: 4
+ *                 maxLength: 4
+ *                 example: "3988"
+ *                 description: Code CPS à 4 chiffres du professionnel
+ *     responses:
+ *       200:
+ *         description: Authentification CPS réussie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Authentification CPS réussie"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     professionnel:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 79
+ *                         nom:
+ *                           type: string
+ *                           example: "Sakura"
+ *                         prenom:
+ *                           type: string
+ *                           example: "Saza"
+ *                         specialite:
+ *                           type: string
+ *                           example: "Cardiologie"
+ *                         role:
+ *                           type: string
+ *                           example: "medecin"
+ *                     token:
+ *                       type: string
+ *                       description: JWT token pour l'authentification
+ *       400:
+ *         description: Code CPS manquant ou invalide
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Code CPS requis"
+ *       401:
+ *         description: Code CPS incorrect
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Code CPS incorrect"
+ */
+router.post('/cps/login', authController.authenticateCPS);
+
+/**
+ * @swagger
+ * /auth/authenticate-cps:
+ *   post:
+ *     summary: Authentification CPS (alias)
+ *     tags: [Auth - CPS]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - cpsCode
+ *             properties:
+ *               cpsCode:
+ *                 type: string
+ *                 minLength: 4
+ *                 maxLength: 4
+ *                 example: "3988"
+ *                 description: Code CPS à 4 chiffres du professionnel
+ *     responses:
+ *       200:
+ *         description: Authentification CPS réussie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Authentification CPS réussie"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     professionnel:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 79
+ *                         nom:
+ *                           type: string
+ *                           example: "Sakura"
+ *                         prenom:
+ *                           type: string
+ *                           example: "Saza"
+ *                         specialite:
+ *                           type: string
+ *                           example: "Cardiologie"
+ *                         role:
+ *                           type: string
+ *                           example: "medecin"
+ *                     token:
+ *                       type: string
+ *                       description: JWT token pour l'authentification
+ *       400:
+ *         description: Code CPS manquant ou invalide
+ *       401:
+ *         description: Code CPS incorrect
+ */
+router.post('/authenticate-cps', authController.authenticateCPS); // Alias pour compatibilité
+
+/**
+ * @swagger
+ * /auth/access-options:
+ *   get:
+ *     summary: Récupérer les options d'accès pour professionnel authentifié
+ *     tags: [Auth - CPS]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Options d'accès récupérées
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     accessOptions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             example: "demande_standard"
+ *                           name:
+ *                             type: string
+ *                             example: "Demande d'accès standard"
+ *                           description:
+ *                             type: string
+ *                             example: "Demander l'accès au dossier médical du patient"
+ *                           requiresPatientId:
+ *                             type: boolean
+ *                             example: true
+ *                           type:
+ *                             type: string
+ *                             example: "standard"
+ *                           requiresJustification:
+ *                             type: boolean
+ *                             example: false
+ *       401:
+ *         description: Non authentifié
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: error
+ *                 message:
+ *                   type: string
+ *                   example: "Vous n'êtes pas connecté"
+ */
+router.get('/access-options', authMiddleware.protect, authController.getAccessOptions);
+
+// Existing routes
+
 /**
  * @swagger
  * /auth/register:
@@ -25,22 +244,27 @@ const router = express.Router();
  *               nom:
  *                 type: string
  *                 example: "Dupont"
+ *                 description: Nom de l'utilisateur
  *               prenom:
  *                 type: string
  *                 example: "Jean"
+ *                 description: Prénom de l'utilisateur
  *               email:
  *                 type: string
  *                 format: email
- *                 example: "jean.dupont@email.com"
+ *                 example: "jean.dupont@example.com"
+ *                 description: Adresse email
  *               mot_de_passe:
  *                 type: string
  *                 minLength: 6
  *                 example: "motdepasse123"
+ *                 description: Mot de passe
  *               role:
  *                 type: string
- *                 enum: [admin, secretaire, visiteur]
+ *                 enum: [admin, secretaire]
  *                 default: secretaire
  *                 example: "secretaire"
+ *                 description: Rôle de l'utilisateur
  *     responses:
  *       201:
  *         description: Utilisateur créé avec succès
@@ -54,25 +278,25 @@ const router = express.Router();
  *                   example: success
  *                 token:
  *                   type: string
- *                   description: JWT token
+ *                   description: JWT token pour l'authentification
  *                 data:
  *                   type: object
  *                   properties:
  *                     user:
- *                       $ref: '#/components/schemas/Utilisateur'
+ *                       type: object
+ *                       properties:
+ *                         id_utilisateur:
+ *                           type: integer
+ *                         nom:
+ *                           type: string
+ *                         prenom:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         role:
+ *                           type: string
  *       400:
- *         description: Erreur de validation
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Les champs suivants sont requis : nom, prenom, email, mot_de_passe"
+ *         description: Données invalides ou champs manquants
  */
 router.post('/register', authController.register);
 
@@ -80,7 +304,7 @@ router.post('/register', authController.register);
  * @swagger
  * /auth/login:
  *   post:
- *     summary: Connexion utilisateur (admin, secretaire)
+ *     summary: Connexion utilisateur
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -95,10 +319,12 @@ router.post('/register', authController.register);
  *               email:
  *                 type: string
  *                 format: email
- *                 example: admin@email.com
+ *                 example: "jean.dupont@example.com"
+ *                 description: Adresse email
  *               mot_de_passe:
  *                 type: string
- *                 example: motdepasseadmin
+ *                 example: "motdepasse123"
+ *                 description: Mot de passe
  *     responses:
  *       200:
  *         description: Connexion réussie
@@ -112,25 +338,25 @@ router.post('/register', authController.register);
  *                   example: success
  *                 token:
  *                   type: string
- *                   description: JWT token
+ *                   description: JWT token pour l'authentification
  *                 data:
  *                   type: object
  *                   properties:
  *                     user:
- *                       $ref: '#/components/schemas/Utilisateur'
+ *                       type: object
+ *                       properties:
+ *                         id_utilisateur:
+ *                           type: integer
+ *                         nom:
+ *                           type: string
+ *                         prenom:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         role:
+ *                           type: string
  *       401:
  *         description: Email ou mot de passe incorrect
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: "Email ou mot de passe incorrect"
  */
 router.post('/login', authController.login);
 

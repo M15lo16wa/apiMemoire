@@ -9,6 +9,8 @@ const {
   updateValidationRules,
   searchValidationRules,
   paramValidationRules,
+  prescriptionParamValidationRules,
+  patientParamValidationRules,
   renouvellementValidationRules,
   suspensionValidationRules,
   transfertValidationRules,
@@ -460,7 +462,7 @@ router.get('/search',
  */
 router.get('/patient/:patient_id', 
   authenticateToken, 
-  paramValidationRules, 
+  patientParamValidationRules, 
   handleValidationErrors, 
   PrescriptionController.getPrescriptionsByPatient
 );
@@ -494,6 +496,81 @@ router.get('/patient/:patient_id/actives',
 
 /**
  * @swagger
+ * /prescription/ordonnances-recentes:
+ *   get:
+ *     summary: Récupérer les prescriptions les plus récentes
+ *     tags: [Prescription]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Nombre de prescriptions à récupérer
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [tous, ordonnance, examen]
+ *           default: tous
+ *         description: Type de prescription à filtrer
+ *       - in: query
+ *         name: professionnel_id
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID du professionnel (optionnel, utilise le professionnel connecté par défaut)
+ *       - in: query
+ *         name: patient_id
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: ID du patient pour filtrer les prescriptions (optionnel)
+ *     responses:
+ *       200:
+ *         description: Prescriptions récentes récupérées avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Prescriptions récentes récupérées avec succès
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     prescriptions:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/PrescriptionModerne'
+ *                     total:
+ *                       type: integer
+ *                       description: Nombre total de prescriptions correspondant aux critères
+ *                     limit:
+ *                       type: integer
+ *                       description: Nombre de prescriptions retournées
+ *                     type:
+ *                       type: string
+ *                       description: Type de prescription filtré
+ *                     periode:
+ *                       type: object
+ *                       description: Période couverte par les prescriptions
+ */
+router.get('/ordonnances-recentes', 
+  authenticateToken, 
+  PrescriptionController.getOrdonnancesRecentes
+);
+
+/**
+ * @swagger
  * /prescription/{id}:
  *   get:
  *     summary: Récupérer une prescription par son ID
@@ -523,7 +600,7 @@ router.get('/:id',
 
 /**
  * @swagger
- * /prescription/{id}:
+ * /prescription/update/{id}:
  *   put:
  *     summary: Mettre à jour une prescription
  *     tags: [Prescription]
@@ -570,7 +647,7 @@ router.get('/:id',
  *       404:
  *         description: Prescription non trouvée
  */
-router.put('/:id', 
+router.put('/update/:id', 
   authenticateToken, 
   paramValidationRules, 
   updateValidationRules, 
@@ -580,7 +657,7 @@ router.put('/:id',
 
 /**
  * @swagger
- * /prescription/{id}:
+ * /prescription/delete/{id}:
  *   delete:
  *     summary: Supprimer une prescription (soft delete)
  *     tags: [Prescription]
@@ -602,7 +679,7 @@ router.put('/:id',
  *       404:
  *         description: Prescription non trouvée
  */
-router.delete('/:id', 
+router.delete('/delete/:id', 
   authenticateToken, 
   paramValidationRules, 
   handleValidationErrors, 
@@ -921,65 +998,7 @@ router.post('/validate/signature',
   PrescriptionController.validateSignature
 );
 
-/**
- * @swagger
- * /prescription/ordonnances-recentes:
- *   get:
- *     summary: Récupérer les ordonnances récemment créées par le professionnel
- *     tags: [Prescription]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: Numéro de page
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 50
- *           default: 10
- *         description: Nombre d'éléments par page
- *       - in: query
- *         name: jours
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 30
- *           default: 7
- *         description: Nombre de jours à considérer
- *     responses:
- *       200:
- *         description: Ordonnances récentes récupérées
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 data:
- *                   type: object
- *                   properties:
- *                     ordonnances:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/PrescriptionModerne'
- *                     pagination:
- *                       type: object
- *                     periode:
- *                       type: object
- */
-router.get('/ordonnances-recentes', 
-  authenticateToken, 
-  PrescriptionController.getOrdonnancesRecentes
-);
+
 
 /**
  * @swagger
@@ -1020,7 +1039,7 @@ router.get('/ordonnances-recentes',
  */
 router.post('/:prescription_id/ajouter-dossier',
   authenticateToken,
-  paramValidationRules,
+  prescriptionParamValidationRules,
   handleValidationErrors,
   PrescriptionController.ajouterAuDossierPatient
 );
@@ -1068,7 +1087,7 @@ router.post('/:prescription_id/ajouter-dossier',
  */
 router.post('/:prescription_id/notification',
   authenticateToken,
-  paramValidationRules,
+  prescriptionParamValidationRules,
   handleValidationErrors,
   PrescriptionController.creerNotification
 );
@@ -1140,7 +1159,7 @@ router.patch('/notification/:notification_id/lue',
  */
 router.get('/patient/:patient_id/notifications',
   authenticateToken,
-  paramValidationRules,
+  patientParamValidationRules,
   handleValidationErrors,
   PrescriptionController.getNotificationsPatient
 );

@@ -28,15 +28,25 @@ const signToken = (professional) => {
 const createSendToken = (professional, statusCode, res) => {
   const token = signToken(professional);
 
+  // Debug des variables d'environnement
+  console.log('DEBUG COOKIE - JWT_COOKIE_EXPIRES_IN:', process.env.JWT_COOKIE_EXPIRES_IN);
+  console.log('DEBUG COOKIE - Type de JWT_COOKIE_EXPIRES_IN:', typeof process.env.JWT_COOKIE_EXPIRES_IN);
+  
+  // Validation et valeur par défaut
+  const cookieExpiryDays = parseInt(process.env.JWT_COOKIE_EXPIRES_IN) || 7;
+  console.log('DEBUG COOKIE - cookieExpiryDays calculé:', cookieExpiryDays);
+  
+  const cookieExpiryDate = new Date(Date.now() + cookieExpiryDays * 24 * 60 * 60 * 1000);
+  console.log('DEBUG COOKIE - Date d\'expiration calculée:', cookieExpiryDate);
+
   const cookieOptions = {
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
-    ),
+    expires: cookieExpiryDate,
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
   };
 
+  console.log('DEBUG COOKIE - Options du cookie:', cookieOptions);
   res.cookie('jwt', token, cookieOptions);
 
   res.status(statusCode).json({
@@ -84,33 +94,48 @@ exports.loginProfessionnel = async (numero_adeli, mot_de_passe) => {
 
   // Si le professionnel a un compte utilisateur associé, on vérifie sur ce compte
   if (professionnel.compteUtilisateur) {
-    const isPasswordCorrect = await bcrypt.compare(mot_de_passe, professionnel.compteUtilisateur.mot_de_passe);
-    if (!isPasswordCorrect) {
-      console.log('DEBUG LOGIN - Mot de passe incorrect pour compte utilisateur associé');
-      throw new AppError('Numéro ADELI ou mot de passe incorrect', 401);
+    try {
+      const isPasswordCorrect = await bcrypt.compare(mot_de_passe, professionnel.compteUtilisateur.mot_de_passe);
+      if (!isPasswordCorrect) {
+        console.log('DEBUG LOGIN - Mot de passe incorrect pour compte utilisateur associé');
+        throw new AppError('Numéro ADELI ou mot de passe incorrect', 401);
+      }
+      if (professionnel.compteUtilisateur.statut !== 'actif') {
+        throw new AppError('Votre compte est inactif. Veuillez contacter l\'administrateur.', 401);
+      }
+      await professionnel.compteUtilisateur.update({ date_derniere_connexion: new Date() });
+      professionnel.compteUtilisateur.mot_de_passe = undefined;
+      return professionnel;
+    } catch (error) {
+      console.log('DEBUG LOGIN - Erreur lors de la vérification du compte utilisateur:', error.message);
+      // En cas d'erreur avec le compte utilisateur, on continue avec la vérification directe
     }
-    if (professionnel.compteUtilisateur.statut !== 'actif') {
-      throw new AppError('Votre compte est inactif. Veuillez contacter l\'administrateur.', 401);
-    }
-    await professionnel.compteUtilisateur.update({ date_derniere_connexion: new Date() });
-    professionnel.compteUtilisateur.mot_de_passe = undefined;
-    return professionnel;
   }
 
   // Sinon, on vérifie le mot de passe sur le professionnel lui-même
+  console.log('DEBUG LOGIN - Vérification directe du professionnel');
+  
   if (!professionnel.mot_de_passe) {
     console.log('DEBUG LOGIN - Aucun mot de passe défini pour ce professionnel');
     throw new AppError('Aucun mot de passe défini pour ce professionnel', 401);
   }
+  
+  console.log('DEBUG LOGIN - Comparaison des mots de passe...');
   const isPasswordCorrect = await bcrypt.compare(mot_de_passe, professionnel.mot_de_passe);
+  console.log('DEBUG LOGIN - Résultat de la comparaison:', isPasswordCorrect);
+  
   if (!isPasswordCorrect) {
     console.log('DEBUG LOGIN - Mot de passe incorrect pour professionnel');
     throw new AppError('Numéro ADELI ou mot de passe incorrect', 401);
   }
+  
+  console.log('DEBUG LOGIN - Mot de passe correct, vérification du statut...');
   // On peut aussi vérifier le statut si besoin (ex: professionnel.statut)
   if (professionnel.statut && professionnel.statut !== 'actif') {
     throw new AppError('Votre compte professionnel est inactif. Veuillez contacter l\'administrateur.', 401);
   }
+  
+  console.log('DEBUG LOGIN - Authentification réussie, retour du professionnel');
   // On peut mettre à jour une date de connexion si besoin
   return professionnel;
 };

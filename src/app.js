@@ -13,12 +13,20 @@ const swaggerJSDoc = require('swagger-jsdoc');
 const app = express();
 
 // middleware general
-app.use(cors());
+// Configuration CORS plus permissive pour le développement
+const corsOptions = {
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Optionnel: Logging des requêtes HTTP en mode dev
+
 if (process.env.NODE_ENV === 'development') {
     app.use(morgan('dev'));
 }
@@ -721,8 +729,6 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  *     description: Gestion des établissements hospitaliers
  *   - name: Patient
  *     description: Gestion des patients
- *   - name: DMP - Patient
- *     description: Dossier Médical Partagé - Fonctionnalités patient
  *   - name: Auth
  *     description: Authentification et autorisation
  *
@@ -826,6 +832,20 @@ app.all('*', (req, res, next) => {
 
 // Middleware de gestion globale des erreurs
 app.use(globalErrorHandler);
+
+// Initialisation du service cron pour les tâches automatiques
+if (process.env.NODE_ENV !== 'test') {
+    const CronService = require('./services/CronService');
+    const cronService = new CronService();
+    
+    // Initialiser les tâches cron
+    cronService.init();
+    
+    // Exposer le service cron globalement pour les tests manuels
+    global.cronService = cronService;
+    
+    console.log('🕐 Service cron initialisé');
+}
 
 module.exports = app;
 

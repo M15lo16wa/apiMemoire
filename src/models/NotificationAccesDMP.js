@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 
 module.exports = (sequelize) => {
   const NotificationAccesDMP = sequelize.define('NotificationAccesDMP', {
@@ -166,7 +166,7 @@ module.exports = (sequelize) => {
       where: {
         statut_envoi: 'en_attente',
         date_creation: {
-          [sequelize.Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000) // 24h
+          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000) // 24h
         }
       },
       order: [['priorite', 'DESC'], ['date_creation', 'ASC']],
@@ -178,7 +178,7 @@ module.exports = (sequelize) => {
     return await this.findAll({
       where: {
         date_expiration: {
-          [sequelize.Op.lt]: new Date()
+          [Op.lt]: new Date()
         },
         statut_envoi: 'en_attente'
       }
@@ -190,10 +190,10 @@ module.exports = (sequelize) => {
     return await this.destroy({
       where: {
         date_creation: {
-          [sequelize.Op.lt]: dateLimite
+          [Op.lt]: dateLimite
         },
         statut_envoi: {
-          [sequelize.Op.in]: ['livree', 'echouee']
+          [Op.in]: ['livree', 'echouee']
         }
       }
     });

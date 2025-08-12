@@ -265,6 +265,8 @@ async getDossiersByPatientId(patientId, includes = []) {
  */
 async getDossierCompletPatient(patientId) {
     try {
+        console.log('🔍 [service.getDossierCompletPatient] Début pour le patient:', patientId);
+        
         // Récupérer le dossier médical principal
         const dossier = await DossierMedical.findOne({
             where: { patient_id: patientId },
@@ -288,6 +290,8 @@ async getDossierCompletPatient(patientId) {
         if (!dossier) {
             throw new Error('Dossier médical non trouvé pour ce patient.');
         }
+
+        console.log('✅ [service.getDossierCompletPatient] Dossier principal trouvé, récupération des données associées...');
 
         // Récupérer les prescriptions actives
         const prescriptions = await Prescription.findAll({
@@ -380,6 +384,8 @@ async getDossierCompletPatient(patientId) {
             limit: 5
         });
 
+        console.log('✅ [service.getDossierCompletPatient] Toutes les données récupérées avec succès');
+
         // Construire le dossier complet
         const dossierComplet = {
             dossier: dossier,
@@ -399,8 +405,22 @@ async getDossierCompletPatient(patientId) {
 
         return dossierComplet;
     } catch (error) {
-        console.error(`Erreur lors de la récupération du dossier complet pour le patient ${patientId}:`, error);
-        throw new Error('Impossible de récupérer le dossier médical complet.');
+        console.error('❌ [service.getDossierCompletPatient] Erreur lors de la récupération du dossier complet pour le patient', patientId, ':', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
+        
+        // Remonter l'erreur avec plus de contexte
+        if (error.name === 'SequelizeValidationError') {
+            throw new Error(`Erreur de validation des données: ${error.message}`);
+        } else if (error.name === 'SequelizeDatabaseError') {
+            throw new Error(`Erreur de base de données: ${error.message}`);
+        } else if (error.name === 'SequelizeConnectionError') {
+            throw new Error('Erreur de connexion à la base de données');
+        } else {
+            throw new Error(`Impossible de récupérer le dossier médical complet: ${error.message}`);
+        }
     }
 },
 

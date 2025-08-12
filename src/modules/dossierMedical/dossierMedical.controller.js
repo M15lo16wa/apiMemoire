@@ -168,19 +168,38 @@ exports.getDossierCompletPatient = async (req, res) => {
     try {
         const { patient_id } = req.params;
         
-        // Vérification des autorisations
-        if (req.user.role === 'patient' && req.user.id_patient !== parseInt(patient_id)) {
-            return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à accéder à ce dossier.' });
-        }
-
+        console.log('🔍 [getDossierCompletPatient] Début de la récupération pour le patient:', patient_id);
+        
+        // L'accès a déjà été vérifié par le middleware checkMedicalRecordAccess
+        // req.accessInfo contient les informations d'accès
         const dossierComplet = await dossierMedicalService.getDossierCompletPatient(patient_id);
+        
+        console.log('✅ [getDossierCompletPatient] Dossier récupéré avec succès');
         
         res.status(200).json({
             status: 'success',
             data: dossierComplet
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        console.error('❌ [getDossierCompletPatient] Erreur lors de la récupération du dossier:', {
+            patient_id: req.params.patient_id,
+            error: error.message,
+            stack: error.stack
+        });
+        
+        // Gestion d'erreur plus robuste
+        if (error.message.includes('non trouvé')) {
+            return res.status(404).json({ 
+                status: 'error',
+                message: error.message 
+            });
+        }
+        
+        res.status(500).json({ 
+            status: 'error',
+            message: 'Erreur interne du serveur lors de la récupération du dossier médical',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 
@@ -193,11 +212,8 @@ exports.getResumePatient = async (req, res) => {
     try {
         const { patient_id } = req.params;
         
-        // Vérification des autorisations
-        if (req.user.role === 'patient' && req.user.id_patient !== parseInt(patient_id)) {
-            return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à accéder à ce résumé.' });
-        }
-
+        // L'accès a déjà été vérifié par le middleware checkMedicalRecordAccess
+        // req.accessInfo contient les informations d'accès
         const resume = await dossierMedicalService.getResumePatient(patient_id);
         
         res.status(200).json({

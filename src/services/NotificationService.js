@@ -29,6 +29,14 @@ class NotificationService {
    * @returns {Object} - Client Twilio
    */
   createSMSClient() {
+    // Vérifier que les variables Twilio sont valides avant d'initialiser
+    if (!process.env.TWILIO_ACCOUNT_SID || 
+        !process.env.TWILIO_AUTH_TOKEN || 
+        process.env.TWILIO_ACCOUNT_SID === 'votre_account_sid_twilio' ||
+        process.env.TWILIO_AUTH_TOKEN === 'votre_auth_token_twilio') {
+      console.log('⚠️ Variables Twilio non configurées, SMS désactivé');
+      return null;
+    }
     return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   }
 
@@ -70,6 +78,13 @@ class NotificationService {
    */
   async envoyerSMS(notification) {
     try {
+      // Vérifier que le client SMS est disponible
+      if (!this.smsClient) {
+        console.log('⚠️ Client SMS non disponible, notification marquée comme échouée');
+        await notification.marquerEchouee('Service SMS non configuré');
+        throw new Error('Service SMS non configuré');
+      }
+
       const message = await this.smsClient.messages.create({
         body: notification.contenu_notification,
         from: process.env.TWILIO_PHONE_NUMBER,
@@ -146,7 +161,93 @@ class NotificationService {
   }
 
   /**
-   * Crée une notification d'accès au DMP
+   * Envoie une notification à un professionnel de santé
+   * @param {Object} donnees - Données de la notification
+   * @returns {Object} - Résultat de l'envoi
+   */
+  async envoyerNotificationProfessionnel(donnees) {
+    try {
+      const { professionnel_id, type_notification, titre, message, metadata } = donnees;
+      
+      // Récupérer les informations du professionnel
+      const professionnel = await ProfessionnelSante.findByPk(professionnel_id);
+      if (!professionnel) {
+        throw new Error('Professionnel non trouvé');
+      }
+
+      // Créer la notification
+      const notification = await NotificationAccesDMP.create({
+        professionnel_id: professionnel_id,
+        type_notification: type_notification,
+        canal_envoi: 'email', // Par défaut, on envoie par email
+        contenu_notification: message,
+        titre: titre,
+        message: message,
+        destinataire: professionnel.email || `professionnel.${professionnel_id}@hospital.local`,
+        statut_envoi: 'en_attente',
+        priorite: this.getPriorite(type_notification),
+        metadata: metadata || {}
+      });
+
+      // Envoyer la notification
+      const resultat = await this.envoyerNotification(notification);
+      
+      return {
+        success: true,
+        notification_id: notification.id_notification,
+        resultat: resultat
+      };
+    } catch (error) {
+      console.error('Erreur envoi notification professionnel:', error);
+      throw new Error(`Erreur envoi notification professionnel: ${error.message}`);
+    }
+  }
+
+  /**
+   * Envoie une notification à un patient
+   * @param {Object} donnees - Données de la notification
+   * @returns {Object} - Résultat de l'envoi
+   */
+  async envoyerNotificationPatient(donnees) {
+    try {
+      const { patient_id, type_notification, titre, message, metadata } = donnees;
+      
+      // Récupérer les informations du patient
+      const patient = await Patient.findByPk(patient_id);
+      if (!patient) {
+        throw new Error('Patient non trouvé');
+      }
+
+      // Créer la notification
+      const notification = await NotificationAccesDMP.create({
+        patient_id: patient_id,
+        type_notification: type_notification,
+        canal_envoi: 'email', // Par défaut, on envoie par email
+        contenu_notification: message,
+        titre: titre,
+        message: message,
+        destinataire: patient.email || `patient.${patient_id}@hospital.local`,
+        statut_envoi: 'en_attente',
+        priorite: this.getPriorite(type_notification),
+        metadata: metadata || {}
+      });
+
+      // Envoyer la notification
+      const resultat = await this.envoyerNotification(notification);
+      
+      return {
+        success: true,
+        notification_id: notification.id_notification,
+        resultat: resultat
+      };
+    } catch (error) {
+      console.error('Erreur envoi notification patient:', error);
+      throw new Error(`Erreur envoi notification patient: ${error.message}`);
+    }
+  }
+
+  /**
+   * Crée une notification d'accès au dossier médical
    * @param {Object} donnees - Données de la notification
    * @returns {Object} - Notification créée
    */
@@ -189,7 +290,7 @@ class NotificationService {
             canal_envoi,
             contenu,
             contenuHtml,
-            this.generateEmailSubject(type_notification) || 'Notification DMP',
+            this.generateEmailSubject(type_notification) || 'Notification Hospital',
             contenu,
             patient.email || patient.telephone,
             'en_attente',
@@ -232,16 +333,16 @@ class NotificationService {
 
     switch (type) {
       case 'demande_validation':
-        return `Dr. ${nomProfessionnel} demande l'accès à votre dossier médical partagé (DMP). Raison: ${donnees.raison_acces || 'Consultation médicale'}. Veuillez valider cette demande.`;
+        return `Dr. ${nomProfessionnel} demande l'accès à votre dossier médical. Raison: ${donnees.raison_acces || 'Consultation médicale'}. Veuillez valider cette demande.`;
       
       case 'information_acces':
-        return `Dr. ${nomProfessionnel} a accédé à votre dossier médical partagé (DMP) en mode ${donnees.mode_acces}. Durée: ${donnees.duree_acces || 60} minutes.`;
+        return `Dr. ${nomProfessionnel} a accédé à votre dossier médical en mode ${donnees.mode_acces}. Durée: ${donnees.duree_acces || 60} minutes.`;
       
       case 'alerte_securite':
-        return `ALERTE: Accès à votre dossier médical partagé (DMP) par Dr. ${nomProfessionnel} en mode ${donnees.mode_acces}. Si vous n'êtes pas à l'origine de cette demande, contactez immédiatement votre médecin.`;
+        return `ALERTE: Accès à votre dossier médical par Dr. ${nomProfessionnel} en mode ${donnees.mode_acces}. Si vous n'êtes pas à l'origine de cette demande, contactez immédiatement votre médecin.`;
       
       default:
-        return `Notification concernant votre dossier médical partagé (DMP) de la part de Dr. ${nomProfessionnel}.`;
+        return `Notification concernant votre dossier médical de la part de Dr. ${nomProfessionnel}.`;
     }
   }
 
@@ -258,7 +359,7 @@ class NotificationService {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Notification DMP</title>
+        <title>Notification Hospital</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -272,7 +373,7 @@ class NotificationService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>Dossier Médical Partagé (DMP)</h1>
+            <h1>Dossier Médical Hospital</h1>
           </div>
           <div class="content">
             <h2>Notification d'accès</h2>
@@ -288,7 +389,7 @@ class NotificationService {
             <p><strong>Type:</strong> ${type_notification.replace('_', ' ')}</p>
           </div>
           <div class="footer">
-            <p>Ce message est généré automatiquement par le système DMP.</p>
+            <p>Ce message est généré automatiquement par le système hospitalier.</p>
             <p>Pour toute question, contactez votre médecin traitant.</p>
           </div>
         </div>
@@ -305,13 +406,13 @@ class NotificationService {
   generateEmailSubject(type) {
     switch (type) {
       case 'demande_validation':
-        return 'Demande d\'accès à votre DMP - Action requise';
+        return 'Demande d\'accès à votre dossier médical - Action requise';
       case 'information_acces':
-        return 'Information - Accès à votre DMP';
+        return 'Information - Accès à votre dossier médical';
       case 'alerte_securite':
-        return 'ALERTE SÉCURITÉ - Accès à votre DMP';
+        return 'ALERTE SÉCURITÉ - Accès à votre dossier médical';
       default:
-        return 'Notification DMP';
+        return 'Notification Hospital';
     }
   }
 

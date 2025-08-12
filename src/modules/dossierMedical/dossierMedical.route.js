@@ -6,6 +6,7 @@ const { body } = require('express-validator');
 const dossierMedicalController = require('./dossierMedical.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
 const { authenticateToken } = require('../../middlewares/auth.middleware');
+const { checkMedicalRecordAccess, logMedicalRecordAccess } = require('../../middlewares/access.middleware');
 
 /**
  * @swagger
@@ -527,15 +528,19 @@ router.delete('/:id',
     dossierMedicalController.deleteDossier
 );
 
-// Nouvelles routes pour le partage patient-médecin
+// Routes pour le partage patient-médecin avec middleware d'accès
 router.get('/patient/:patient_id/complet', 
-    authenticateToken, 
-    dossierMedicalController.getDossierCompletPatient
+    authenticateToken, // 1. Vérifie le token
+    checkMedicalRecordAccess, // 2. Vérifie si l'accès au DMP de ce patient est autorisé
+    logMedicalRecordAccess, // 3. Log l'accès
+    dossierMedicalController.getDossierCompletPatient // 4. Exécute la logique finale
 );
 
 router.get('/patient/:patient_id/resume', 
-    authenticateToken, 
-    dossierMedicalController.getResumePatient
+    authenticateToken, // 1. Vérifie le token
+    checkMedicalRecordAccess, // 2. Vérifie si l'accès au DMP de ce patient est autorisé
+    logMedicalRecordAccess, // 3. Log l'accès
+    dossierMedicalController.getResumePatient // 4. Exécute la logique finale
 );
 
 module.exports = router;

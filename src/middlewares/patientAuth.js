@@ -17,7 +17,7 @@ const patientAuth = catchAsync(async (req, res, next) => {
 
   if (!token) {
     return next(
-      new AppError('Vous n\'êtes pas connecté! Veuillez vous connecter pour accéder à votre DMP.', 401)
+      new AppError('Vous n\'êtes pas connecté! Veuillez vous connecter.', 401)
     );
   }
 
@@ -31,7 +31,7 @@ const patientAuth = catchAsync(async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       return next(new AppError('Token invalide. Veuillez vous reconnecter.', 401));
     } else if (error.name === 'TokenExpiredError') {
-      return next(new AppError('Votre session a expiré. Veuillez vous reconnecter à votre DMP.', 401));
+      return next(new AppError('Votre session a expiré. Veuillez vous reconnecter.', 401));
     } else if (error.name === 'NotBeforeError') {
       return next(new AppError('Token non encore valide.', 401));
     }
@@ -57,24 +57,12 @@ const patientAuth = catchAsync(async (req, res, next) => {
   /*
   if (currentPatient.statut_compte !== 'actif') {
     return next(
-      new AppError('Votre compte DMP n\'est pas actif. Veuillez contacter l\'administration.', 403)
+      new AppError('Votre compte n\'est pas actif. Veuillez contacter l\'administration.', 403)
     );
   }
   */
 
-  // 5) Check if patient has access to DMP
-  if (currentPatient.acces_dmp === false) {
-    return next(
-      new AppError('Votre accès au DMP a été révoqué. Contactez votre médecin traitant.', 403)
-    );
-  }
 
-  // 6) Check if DMP access has not expired (if applicable)
-  if (currentPatient.acces_expire && new Date() > currentPatient.acces_expire) {
-    return next(
-      new AppError('Votre accès au DMP a expiré. Veuillez contacter votre médecin traitant.', 403)
-    );
-  }
 
   // 7) Check if password was changed after token was issued
   if (currentPatient.password_changed_at) {
@@ -89,8 +77,8 @@ const patientAuth = catchAsync(async (req, res, next) => {
     }
   }
 
-  // 8) Security audit logging for DMP access
-  console.log(`[DMP ACCESS] Patient ID: ${currentPatient.id}, IP: ${req.ip}, User-Agent: ${req.get('User-Agent')}, Timestamp: ${new Date().toISOString()}`);
+  // 8) Security audit logging for patient access
+  console.log(`[PATIENT ACCESS] Patient ID: ${currentPatient.id}, IP: ${req.ip}, User-Agent: ${req.get('User-Agent')}, Timestamp: ${new Date().toISOString()}`);
 
   // 9) Update last access timestamp for security monitoring
   try {
@@ -107,6 +95,8 @@ const patientAuth = catchAsync(async (req, res, next) => {
   req.patient = currentPatient;
   req.user = {
     role: 'patient',
+    type: 'patient',
+    id: currentPatient.id_patient,
     id_patient: currentPatient.id_patient
   };
   res.locals.patient = currentPatient; // Available in views if needed

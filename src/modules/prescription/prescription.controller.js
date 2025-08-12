@@ -2,6 +2,8 @@ const PrescriptionService = require('./prescription.service');
 const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/appError');
 const { validationResult } = require('express-validator');
+const { Patient, ProfessionnelSante, DossierMedical } = require('../../models');
+const { Op } = require('sequelize');
 
 /**
  * Contrôleur modernisé pour la gestion des prescriptions
@@ -142,6 +144,26 @@ class PrescriptionController {
 
     const { patient_id } = req.params;
     const { statut, type_prescription, page = 1, limit = 10 } = req.query;
+    
+    // Vérification de l'existence du patient
+    const patient = await Patient.findByPk(parseInt(patient_id));
+    if (!patient) {
+      return next(new AppError('Patient non trouvé', 404));
+    }
+
+    // Vérification des autorisations d'accès
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+    
+    // Un patient ne peut accéder qu'à ses propres prescriptions
+    if (userRole === 'patient') {
+      if (parseInt(userId) !== parseInt(patient_id)) {
+        return next(new AppError('Accès non autorisé. Vous ne pouvez accéder qu\'à vos propres prescriptions.', 403));
+      }
+    }
+    
+    // Un professionnel de santé peut accéder aux prescriptions de ses patients
+    // (ici on pourrait ajouter une vérification plus fine si nécessaire)
     
     // Construction des filtres
     const filters = {};
@@ -568,12 +590,38 @@ class PrescriptionController {
   /**
    * Récupérer les ordonnances récemment créées par le professionnel connecté
    */
+  // static getOrdonnancesRecentes = catchAsync(async (req, res, next) => {
+  //   try {
+  //     const professionnelId = req.user.id_professionnel || req.user.id;
+  //     const { page, limit, jours } = req.query;
+
+  //     const result = await PrescriptionService.getOrdonnancesRecentes(professionnelId, {
+  //       page: parseInt(page) || 1,
+  //       limit: parseInt(limit) || 10,
+  //       jours: parseInt(jours) || 7
+  //     });
+
+  //     res.status(200).json({
+  //       status: 'success',
+  //       message: 'Ordonnances récentes récupérées avec succès',
+  //       data: result
+  //     });
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // });
+
+  /**
+   * Récupérer les ordonnances récemment créées par le professionnel connecté
+   */
   static getOrdonnancesRecentes = catchAsync(async (req, res, next) => {
     try {
       const professionnelId = req.user.id_professionnel || req.user.id;
-      const { page, limit, jours } = req.query;
+      const { page, limit, jours, patientId } = req.query;
 
-      const result = await PrescriptionService.getOrdonnancesRecentes(professionnelId, {
+      const result = await PrescriptionService.getOrdonnancesRecentes({
+        professionnelId: professionnelId,
+        patientId: patientId ? parseInt(patientId) : undefined,
         page: parseInt(page) || 1,
         limit: parseInt(limit) || 10,
         jours: parseInt(jours) || 7
@@ -742,6 +790,39 @@ class PrescriptionController {
   });
 
   /**
+   * Récupérer les prescriptions les plus récentes
+   */
+  static getOrdonnancesRecentes = catchAsync(async (req, res, next) => {
+    try {
+      const { 
+        limit = 10, 
+        type = 'tous', 
+        professionnel_id = null,
+        patient_id = null
+      } = req.query;
+
+      // Récupérer l'ID du professionnel connecté si non spécifié
+      // Si aucun professionnel n'est spécifié, on récupère toutes les prescriptions
+      const professionnelConnecte = professionnel_id || req.user.id_professionnel || req.user.id;
+
+      const result = await PrescriptionService.getOrdonnancesRecentes({
+        limit: parseInt(limit),
+        type: type,
+        professionnel_id: professionnel_id ? professionnelConnecte : null,
+        patient_id: patient_id ? parseInt(patient_id) : null
+      });
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Prescriptions récentes récupérées avec succès',
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  /**
    * Récupérer le résumé des ordonnances créées aujourd'hui
    */
   static getResumeOrdonnancesAujourdhui = catchAsync(async (req, res, next) => {
@@ -750,20 +831,30 @@ class PrescriptionController {
       const aujourdhui = new Date();
       aujourdhui.setHours(0, 0, 0, 0);
 
-      const result = await PrescriptionService.getOrdonnancesRecentes(professionnelId, {
-        page: 1,
-        limit: 50,
-        jours: 1
+      // Pour le résumé, on utilise une approche différente car getOrdonnancesRecentes ne prend plus ces paramètres
+      
+      const ordonnancesAujourdhui = await Prescription.findAll({
+        where: {
+          professionnel_id: professionnelId,
+          type_prescription: 'ordonnance',
+          date_prescription: {
+            [Op.gte]: aujourdhui
+          }
+        },
+        order: [['date_prescription', 'DESC']]
       });
 
       const resume = {
-        total_aujourdhui: result.pagination.total,
+        total_aujourdhui: ordonnancesAujourdhui.length,
         par_type: {
-          ordonnances: result.ordonnances.filter(o => o.type_prescription === 'ordonnance').length,
-          examens: result.ordonnances.filter(o => o.type_prescription === 'examen').length
+          ordonnances: ordonnancesAujourdhui.filter(o => o.type_prescription === 'ordonnance').length,
+          examens: ordonnancesAujourdhui.filter(o => o.type_prescription === 'examen').length
         },
-        derniere_ordonnance: result.ordonnances[0] || null,
-        periode: result.periode
+        derniere_ordonnance: ordonnancesAujourdhui[0] || null,
+        periode: {
+          dateDebut: aujourdhui,
+          dateFin: new Date()
+        }
       };
 
       res.status(200).json({

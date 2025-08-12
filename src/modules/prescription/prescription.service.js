@@ -226,59 +226,217 @@ class PrescriptionService {
    * @param {Object} pagination - Options de pagination
    * @returns {Promise<Object>} Prescriptions avec métadonnées
    */
-  static async getPrescriptionsByPatient(patientId, filters = {}, pagination = {}) {
-    try {
-      const { page = 1, limit = 10 } = pagination;
-      const offset = (page - 1) * limit;
 
-      const whereClause = { patient_id: patientId };
-      
-      // Application des filtres
-      if (filters.statut) whereClause.statut = filters.statut;
-      if (filters.type_prescription) whereClause.type_prescription = filters.type_prescription;
-      if (filters.date_debut && filters.date_fin) {
-        whereClause.date_prescription = {
-          [Op.between]: [filters.date_debut, filters.date_fin]
-        };
+  // ... existing code ...
+
+static async getPrescriptionsByPatient(patientId, filters = {}, pagination = {}) {
+  try {
+    console.log('🔍 Service: Récupération des prescriptions pour le patient:', patientId);
+    console.log('🔍 Service: Filtres appliqués:', filters);
+    console.log('🔍 Service: Pagination:', pagination);
+
+    // Construction de la clause WHERE
+    const whereClause = {
+      patient_id: patientId,
+      ...filters
+    };
+
+    // Suppression des valeurs undefined
+    Object.keys(whereClause).forEach(key => {
+      if (whereClause[key] === undefined) {
+        delete whereClause[key];
       }
+    });
 
-      const includeOptions = [
+    console.log('🔍 Service: Clause WHERE finale:', whereClause);
+
+    // Récupération des prescriptions avec associations complètes
+    const prescriptions = await Prescription.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Patient,
+          as: 'patient',
+          attributes: ['id_patient', 'nom', 'prenom', 'date_naissance', 'telephone', 'numero_dossier']
+        },
         {
           model: ProfessionnelSante,
           as: 'redacteur',
-          attributes: ['id_professionnel', 'numero_adeli', 'specialite'],
-          include: [{
-            model: Utilisateur,
-            as: 'compteUtilisateur',
-            attributes: ['nom', 'prenom']
-          }]
+          attributes: ['id_professionnel', 'numero_adeli', 'specialite', 'statut', 'nom', 'prenom', 'email', 'telephone', 'telephone_portable', 'role']
+        },
+        {
+          model: DossierMedical,
+          as: 'dossier',
+          attributes: ['id_dossier', 'numeroDossier', 'dateCreation', 'statut'],
+          required: false
         }
-      ];
+      ],
+      order: [['date_prescription', 'DESC']],
+      limit: pagination.limit || 10,
+      offset: ((pagination.page || 1) - 1) * (pagination.limit || 10)
+    });
 
-      const { count, rows } = await Prescription.findAndCountAll({
-        where: whereClause,
-        include: includeOptions,
-        order: [['date_prescription', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
-      });
+    // Comptage total pour la pagination
+    const total = await Prescription.count({ where: whereClause });
 
-      return {
-        prescriptions: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit),
-          hasNext: page * limit < count,
-          hasPrev: page > 1
-        }
+    // Calcul des informations de pagination
+    const totalPages = Math.ceil(total / (pagination.limit || 10));
+    const currentPage = pagination.page || 1;
+
+    console.log('✅ Service: Prescriptions récupérées avec succès:', prescriptions.length);
+    console.log(' Service: Total des prescriptions:', total);
+    console.log('📄 Service: Page actuelle:', currentPage, '/', totalPages);
+
+    // Formatage des données pour une meilleure lisibilité
+    const prescriptionsFormatees = prescriptions.map(prescription => {
+      const prescriptionData = prescription.toJSON();
+      
+      // Amélioration de l'objet redacteur
+      if (prescriptionData.redacteur) {
+        prescriptionData.redacteur = {
+          id_professionnel: prescriptionData.redacteur.id_professionnel,
+          numero_adeli: prescriptionData.redacteur.numero_adeli,
+          specialite: prescriptionData.redacteur.specialite,
+          statut: prescriptionData.redacteur.statut,
+          // Informations complètes du professionnel (directement depuis le modèle)
+          nom_complet: `${prescriptionData.redacteur.prenom || ''} ${prescriptionData.redacteur.nom || ''}`.trim() || 'Professionnel non identifié',
+          nom: prescriptionData.redacteur.nom || 'Non renseigné',
+          prenom: prescriptionData.redacteur.prenom || 'Non renseigné',
+          email: prescriptionData.redacteur.email || 'Non renseigné',
+          telephone: prescriptionData.redacteur.telephone || prescriptionData.redacteur.telephone_portable || 'Non disponible',
+          role: prescriptionData.redacteur.role || 'Non renseigné',
+          // Informations de contact formatées
+          contact: {
+            email: prescriptionData.redacteur.email || 'Non renseigné',
+            telephone: prescriptionData.redacteur.telephone || prescriptionData.redacteur.telephone_portable || 'Non disponible',
+            telephone_portable: prescriptionData.redacteur.telephone_portable || 'Non disponible'
+          },
+          // Informations professionnelles
+          profession: {
+            numero_adeli: prescriptionData.redacteur.numero_adeli,
+            specialite: prescriptionData.redacteur.specialite,
+            statut: prescriptionData.redacteur.statut,
+            role: prescriptionData.redacteur.role
+          }
+        };
+      }
+
+      // Amélioration de l'objet patient
+      if (prescriptionData.patient) {
+        prescriptionData.patient = {
+          id_patient: prescriptionData.patient.id_patient,
+          nom: prescriptionData.patient.nom,
+          prenom: prescriptionData.patient.prenom,
+          nom_complet: `${prescriptionData.patient.prenom || ''} ${prescriptionData.patient.nom || ''}`.trim(),
+          date_naissance: prescriptionData.patient.date_naissance,
+          telephone: prescriptionData.patient.telephone,
+          numero_dossier: prescriptionData.patient.numero_dossier
+        };
+      }
+
+      // Ajout d'informations calculées
+      prescriptionData.informations_supplementaires = {
+        age_prescription: prescriptionData.date_prescription 
+          ? Math.floor((new Date() - new Date(prescriptionData.date_prescription)) / (1000 * 60 * 60 * 24 * 365.25))
+          : null,
+        statut_lisible: 
+        prescriptionData.statut === 'active' ? 'Active' : 
+        prescriptionData.statut === 'suspendue' ? 'Suspendue' :
+        prescriptionData.statut === 'terminee' ? 'Terminée' :
+        prescriptionData.statut === 'annulee' ? 'Annulée' :
+        prescriptionData.statut === 'en_attente' ? 'En attente' : prescriptionData.statut,
+        type_lisible: 
+        prescriptionData.type_prescription === 'ordonnance' ? 'Ordonnance' :
+        prescriptionData.type_prescription === 'examen' ? 'Examen' : prescriptionData.type_prescription
       };
-    } catch (error) {
-      console.error('❌ Erreur lors de la récupération des prescriptions du patient:', error);
-      throw new AppError('Impossible de récupérer les prescriptions du patient', 500);
-    }
+
+      return prescriptionData;
+    });
+
+    return {
+      prescriptions: prescriptionsFormatees,
+      total: total,
+      pagination: {
+        page: currentPage,
+        limit: pagination.limit || 10,
+        totalPages: totalPages,
+        hasNext: currentPage < totalPages,
+        hasPrev: currentPage > 1,
+        totalElements: total
+      },
+      metadata: {
+        patient_id: patientId,
+        filters_appliques: filters,
+        date_requete: new Date().toISOString(),
+        version_api: '2.0'
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Service: Erreur lors de la récupération des prescriptions:', error);
+    throw new AppError('Impossible de récupérer les prescriptions du patient', 500);
   }
+}
+
+// ... existing code ...
+
+  // static async getPrescriptionsByPatient(patientId, filters = {}, pagination = {}) {
+  //   try {
+  //     const { page = 1, limit = 10 } = pagination;
+  //     const offset = (page - 1) * limit;
+
+  //     const whereClause = { patient_id: patientId };
+      
+  //     // Application des filtres
+  //     if (filters.statut){
+  //       whereClause.statut = filters.statut;
+  //     }
+  //     if (filters.type_prescription){
+  //       whereClause.type_prescription = filters.type_prescription;
+  //     }
+  //     if (filters.date_debut && filters.date_fin) {
+  //       whereClause.date_prescription = {
+  //         [Op.between]: [filters.date_debut, filters.date_fin]
+  //       };
+  //     }
+
+  //     const includeOptions = [
+  //       {
+  //         model: ProfessionnelSante,
+  //         as: 'redacteur',
+  //         attributes: ['id_professionnel', 'numero_adeli', 'specialite'],
+  //         include: [{
+  //           model: Utilisateur,
+  //           as: 'compteUtilisateur',
+  //           attributes: ['nom', 'prenom']
+  //         }]
+  //       }
+  //     ];
+
+  //     const { count, rows } = await Prescription.findAndCountAll({
+  //       where: whereClause,
+  //       include: includeOptions,
+  //       order: [['date_prescription', 'DESC']],
+  //       limit: parseInt(limit),
+  //       offset: parseInt(offset)
+  //     });
+
+  //     return {
+  //       prescriptions: rows,
+  //       pagination: {
+  //         total: count,
+  //         page: parseInt(page),
+  //         limit: parseInt(limit),
+  //         totalPages: Math.ceil(count / limit),
+  //         hasNext: page * limit < count,
+  //         hasPrev: page > 1
+  //       }
+  //     };
+  //   } catch (error) {
+  //     console.error('❌ Erreur lors de la récupération des prescriptions du patient:', error);
+  //     throw new AppError('Impossible de récupérer les prescriptions du patient', 500);
+  //   }
+  // }
 
   /**
    * Recherche avancée de prescriptions
@@ -630,28 +788,40 @@ class PrescriptionService {
   }
 
   /**
-   * Récupérer les ordonnances récemment créées par un professionnel
-   * @param {number} professionnelId - ID du professionnel
-   * @param {Object} options - Options de pagination et filtres
-   * @returns {Promise<Object>} Ordonnances récentes avec métadonnées
+   * Récupérer les prescriptions les plus récentes (ordonnances et examens)
+   * @param {Object} filters - Filtres incluant limit, type, professionnel_id
+   * @returns {Promise<Object>} Prescriptions récentes triées par date
    */
-  static async getOrdonnancesRecentes(professionnelId, options = {}) {
+  static async getOrdonnancesRecentes(filters = {}) {
     try {
-      const { page = 1, limit = 10, jours = 7 } = options;
-      const offset = (page - 1) * limit;
+      const { 
+        limit = 10, 
+        type = 'tous', 
+        professionnel_id = null,
+        patient_id = null
+      } = filters;
+
+      // Construire la clause WHERE
+      const whereClause = {};
       
-      const dateLimite = new Date();
-      dateLimite.setDate(dateLimite.getDate() - jours);
+      // Filtrer par type si spécifié
+      if (type !== 'tous') {
+        whereClause.type_prescription = type;
+      }
+      
+      // Filtrer par professionnel si spécifié
+      if (professionnel_id) {
+        whereClause.professionnel_id = professionnel_id;
+      }
+      // Si aucun professionnel n'est spécifié, on récupère toutes les prescriptions
+      
+      // Filtrer par patient si spécifié
+      if (patient_id) {
+        whereClause.patient_id = patient_id;
+      }
 
-      const whereClause = {
-        professionnel_id: professionnelId,
-        type_prescription: 'ordonnance',
-        date_prescription: {
-          [Op.gte]: dateLimite
-        }
-      };
-
-      const { count, rows } = await Prescription.findAndCountAll({
+      // Récupérer les prescriptions les plus récentes
+      const prescriptions = await Prescription.findAll({
         where: whereClause,
         include: [
           {
@@ -660,35 +830,41 @@ class PrescriptionService {
             attributes: ['id_patient', 'nom', 'prenom', 'date_naissance', 'telephone']
           },
           {
+            model: ProfessionnelSante,
+            as: 'redacteur',
+            attributes: ['id_professionnel', 'numero_adeli', 'specialite'],
+            include: [{
+              model: Utilisateur,
+              as: 'compteUtilisateur',
+              attributes: ['nom', 'prenom']
+            }]
+          },
+          {
             model: DossierMedical,
             as: 'dossier',
             attributes: ['id_dossier', 'numeroDossier', 'dateCreation']
           }
         ],
         order: [['date_prescription', 'DESC']],
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        limit: parseInt(limit)
       });
 
+      // Compter le total pour la pagination
+      const total = await Prescription.count({ where: whereClause });
+
       return {
-        ordonnances: rows,
-        pagination: {
-          total: count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(count / limit),
-          hasNext: page * limit < count,
-          hasPrev: page > 1
-        },
+        prescriptions: prescriptions,
+        total: total,
+        limit: parseInt(limit),
+        type: type,
         periode: {
-          jours,
-          dateDebut: dateLimite,
-          dateFin: new Date()
+          dateDebut: prescriptions.length > 0 ? prescriptions[prescriptions.length - 1].date_prescription : null,
+          dateFin: prescriptions.length > 0 ? prescriptions[0].date_prescription : null
         }
       };
     } catch (error) {
-      console.error('❌ Erreur lors de la récupération des ordonnances récentes:', error);
-      throw new AppError('Impossible de récupérer les ordonnances récentes', 500);
+      console.error('❌ Erreur lors de la récupération des prescriptions récentes:', error);
+      throw new AppError('Impossible de récupérer les prescriptions récentes', 500);
     }
   }
 

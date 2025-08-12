@@ -334,10 +334,19 @@ const searchValidationRules = [
 const paramValidationRules = [
   param('id')
     .isInt({ min: 1 })
-    .withMessage('L\'ID de la prescription doit être un entier positif'),
-    
+    .withMessage('L\'ID de la prescription doit être un entier positif')
+];
+
+// Validation rules spécifiques pour les routes avec prescription_id
+const prescriptionParamValidationRules = [
+  param('prescription_id')
+    .isInt({ min: 1 })
+    .withMessage('L\'ID de la prescription doit être un entier positif')
+];
+
+// Validation rules spécifiques pour les routes patient
+const patientParamValidationRules = [
   param('patient_id')
-    .optional()
     .isInt({ min: 1 })
     .withMessage('L\'ID du patient doit être un entier positif')
 ];
@@ -515,6 +524,8 @@ module.exports = {
   updateValidationRules,
   searchValidationRules,
   paramValidationRules,
+  prescriptionParamValidationRules,
+  patientParamValidationRules,
   renouvellementValidationRules,
   suspensionValidationRules,
   transfertValidationRules,

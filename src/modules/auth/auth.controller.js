@@ -2,6 +2,72 @@ const authService = require('./auth.service');
 const catchAsync = require('../../utils/catchAsync');
 const AppError = require('../../utils/appError');
 
+/**
+ * Authenticate with CPS code
+ */
+exports.authenticateCPS = catchAsync(async (req, res, next) => {
+  const { cpsCode } = req.body;
+
+  if (!cpsCode) {
+    return next(new AppError('Code CPS requis', 400));
+  }
+
+  const professionnel = await authService.authenticateCPS(cpsCode);
+  const token = authService.generateAccessToken(professionnel);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Authentification CPS réussie',
+    data: {
+      professionnel: {
+        id: professionnel.id_professionnel,
+        nom: professionnel.nom,
+        prenom: professionnel.prenom,
+        specialite: professionnel.specialite,
+        role: professionnel.role
+      },
+      token
+    }
+  });
+});
+
+/**
+ * Get access options for authenticated professional
+ */
+exports.getAccessOptions = catchAsync(async (req, res, next) => {
+  // const professionnelId = req.user.id;
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      accessOptions: [
+        {
+          id: 'demande_standard',
+          name: 'Demande d\'accès standard',
+          description: 'Demander l\'accès au dossier médical du patient',
+          requiresPatientId: true,
+          type: 'standard'
+        },
+        {
+          id: 'acces_urgence',
+          name: 'Accès en mode urgence',
+          description: 'Accès immédiat au dossier en cas d\'urgence vitale',
+          requiresPatientId: true,
+          type: 'urgence',
+          requiresJustification: true
+        },
+        {
+          id: 'acces_secret',
+          name: 'Accès secret',
+          description: 'Accès discret au dossier (traçé mais non notifié)',
+          requiresPatientId: true,
+          type: 'secret'
+        }
+      ]
+    }
+  });
+});
+
 exports.register = catchAsync(async (req, res, next) => {
   // Validation des champs requis pour un utilisateur
   const requiredFields = ['nom', 'prenom', 'email', 'mot_de_passe'];
