@@ -97,12 +97,59 @@ router.post('/request-standard', accessController.requestStandardAccess);
  *                     authorization:
  *                       $ref: '#/components/schemas/AutorisationAcces'
  */
+// Route pour les professionnels (existant)
 router.get(
     '/status/:patientId',
     authMiddleware.protect,
     authMiddleware.restrictTo('medecin', 'infirmier'),
     validationMiddleware.validateRouteParams(['patientId']),
     accessController.getAccessStatusForPatient
+);
+
+// NOUVELLE ROUTE pour permettre aux patients d'accéder à leur propre statut d'accès
+/**
+ * @swagger
+ * /access/patient/status:
+ *   get:
+ *     summary: Récupérer le statut d'accès du patient connecté
+ *     tags: [Access - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statut d'accès récupéré avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     patient_id:
+ *                       type: integer
+ *                       description: ID du patient
+ *                     accessRequests:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/AutorisationAcces'
+ *                     activeAuthorizations:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/AutorisationAcces'
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès refusé
+ */
+router.get(
+    '/patient/status',
+    authMiddleware.protect,
+    patientAccessMiddleware.requirePatientAuth,
+    accessController.getPatientAccessStatus
 );
 
 /**
@@ -724,7 +771,11 @@ router.patch('/authorization/:id', accessController.updateAuthorizationAccess);
  *       404:
  *         description: Autorisation non trouvée
  */
-router.delete('/authorization/:id', accessController.revokeAuthorizationAccess);
+router.delete('/authorization/:id', 
+  authMiddleware.protect, 
+  authMiddleware.restrictTo('medecin', 'infirmier', 'admin'),
+  accessController.revokeAuthorizationAccess
+);
 
 /**
  * @swagger
@@ -1001,5 +1052,48 @@ router.get('/check/:professionnelId/:patientId/:typeAcces', accessController.che
  *         description: Non autorisé
  */
 router.post('/log', accessController.logAccess);
+
+/**
+ * @swagger
+ * /access/patient/authorization/{id}:
+ *   delete:
+ *     summary: Révoquer une autorisation d'accès (pour les patients)
+ *     tags: [Access - Patient]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de l'autorisation
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Raison de la révocation
+ *     responses:
+ *       200:
+ *         description: Autorisation révoquée avec succès
+ *       400:
+ *         description: Données invalides
+ *       401:
+ *         description: Non autorisé
+ *       403:
+ *         description: Accès refusé
+ *       404:
+ *         description: Autorisation non trouvée
+ */
+router.delete('/patient/authorization/:id',
+  authMiddleware.protect,
+  patientAccessMiddleware.requirePatientAuth,
+  accessController.revokePatientAuthorization
+);
 
 module.exports = router;

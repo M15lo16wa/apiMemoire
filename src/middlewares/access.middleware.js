@@ -61,36 +61,63 @@ exports.verifyDMPAccessToken = catchAsync(async (req, res, next) => {
  */
 exports.checkMedicalRecordAccess = catchAsync(async (req, res, next) => {
     // 1. Récupérer les IDs nécessaires
-    const professionnelId = req.user.id;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    const userType = req.user.type;
     const patientId = req.params.patient_id || req.params.patientId || req.body.patient_id;
 
     if (!patientId) {
         return next(new AppError('ID du patient manquant pour la vérification d\'accès.', 400));
     }
-    if (!professionnelId) {
-        return next(new AppError('ID du professionnel non identifié. Assurez-vous d\'être connecté.', 401));
+
+    // 2. Vérifier si c'est un patient qui accède à ses propres données
+    if (userRole === 'patient' || userType === 'patient') {
+        const patientUserId = req.user.id_patient || req.user.id;
+        
+        if (parseInt(patientId) === parseInt(patientUserId)) {
+            // Le patient accède à ses propres données - autorisé
+            req.accessInfo = {
+                hasAccess: true,
+                accessType: 'patient_own_data',
+                authorizationId: null,
+                isPatientAccess: true
+            };
+            return next();
+        } else {
+            return next(new AppError("Accès refusé. Un patient ne peut accéder qu'à ses propres données.", 403));
+        }
     }
 
-    // 2. Appeler le service centralisé pour vérifier le statut
-    // C'est ici que nous utilisons la fonction améliorée du service
-    const { accessStatus, authorization } = await accessService.checkAccess(professionnelId, patientId);
+    // 3. Si c'est un professionnel, vérifier l'autorisation
+    if (userRole === 'professionnel' || userType === 'professionnel' || req.professionnel) {
+        const professionnelId = req.user.id_professionnel || req.user.id;
+        
+        if (!professionnelId) {
+            return next(new AppError('ID du professionnel non identifié. Assurez-vous d\'être connecté.', 401));
+        }
 
-    // 3. Vérifier le résultat
-    if (accessStatus !== 'active') {
-        return next(new AppError("Accès refusé. Vous n'avez pas d'autorisation active pour consulter ce dossier.", 403));
+        // Appeler le service centralisé pour vérifier le statut
+        const { accessStatus, authorization } = await accessService.checkAccess(professionnelId, patientId);
+
+        // Vérifier le résultat
+        if (accessStatus !== 'active') {
+            return next(new AppError("Accès refusé. Vous n'avez pas d'autorisation active pour consulter ce dossier.", 403));
+        }
+
+        // Attacher les informations d'accès à la requête
+        req.authorization = authorization;
+        req.accessInfo = {
+            hasAccess: true,
+            accessType: authorization.type_acces,
+            authorizationId: authorization.id_acces,
+            isPatientAccess: false
+        };
+        
+        return next();
     }
 
-    // 4. (Optionnel mais recommandé) Attacher les informations d'accès à la requête
-    // pour les middlewares ou contrôleurs suivants (comme le logger).
-    req.authorization = authorization; // L'objet autorisation complet
-    req.accessInfo = { // Garder votre structure existante
-        hasAccess: true,
-        accessType: authorization.type_acces,
-        authorizationId: authorization.id_acces
-    };
-
-    // 5. Accès autorisé, passer à la suite
-    next();
+    // 4. Si aucun des cas ci-dessus, accès refusé
+    return next(new AppError('Type d\'utilisateur non reconnu ou accès non autorisé.', 403));
 });
 
 /**
@@ -136,14 +163,22 @@ exports.logMedicalRecordAccess = catchAsync(async (req, res, next) => {
   // Récupérer l'ID patient depuis différents emplacements possibles
   const patient_id = req.params.patient_id || req.params.patientId || req.body.patient_id;
   
+  // Déterminer l'action selon le type d'accès
+  let action = 'acces_dossier_medical';
+  if (req.accessInfo?.accessType === 'urgence') {
+    action = 'acces_urgence_dossier';
+  } else if (req.accessInfo?.isPatientAccess) {
+    action = 'acces_patient_propre_dossier';
+  }
+  
   const logData = {
     date_heure_acces: new Date(),
-    action: req.accessInfo?.accessType === 'urgence' ? 'acces_urgence_dossier' : 'acces_dossier_medical',
+    action: action,
     type_ressource: 'DossierMedical',
     id_ressource: patient_id,
     details: `Accès au dossier médical du patient ${patient_id}`,
     statut: 'SUCCES',
-    professionnel_id: req.user.id,
+    professionnel_id: req.accessInfo?.isPatientAccess ? null : req.user.id_professionnel || req.user.id,
     id_patient: patient_id,
     adresse_ip: req.ip || req.connection.remoteAddress,
     user_agent: req.get('User-Agent')

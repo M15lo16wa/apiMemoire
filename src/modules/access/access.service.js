@@ -106,20 +106,31 @@ exports.updateAuthorizationAccess = async (id, updateData) => {
 };
 
 /**
- * Revoke Authorization Access
+ * Revoke Authorization Access (for professionals only)
  * @param {number} id - Authorization Access ID
  * @param {string} reason - Reason for revocation
+ * @param {Object} user - User making the request
  * @returns {Object} Updated Authorization Access
  */
-exports.revokeAuthorizationAccess = async (id, reason) => {
+exports.revokeAuthorizationAccess = async (id, reason, user) => {
   const authAccess = await AutorisationAcces.findByPk(id);
   if (!authAccess) {
     throw new AppError('Autorisation d\'accès non trouvée', 404);
   }
 
+  // Seuls les professionnels peuvent utiliser cette route
+  if (user.role === 'medecin' || user.role === 'infirmier') {
+    // Un professionnel ne peut révoquer que ses propres demandes
+    if (authAccess.professionnel_id !== user.id_professionnel && 
+        authAccess.professionnel_id !== user.id) {
+      throw new AppError('Vous ne pouvez révoquer que vos propres autorisations', 403);
+    }
+  }
+
   await authAccess.update({
-    statut: 'Révoqué',
-    raison: reason || authAccess.raison
+    statut: 'refuse', // ✅ Valeur valide de l'enum
+    motif_revocation: reason || 'Révoqué par le professionnel',
+    date_revocation: new Date()
   });
 
   return authAccess;

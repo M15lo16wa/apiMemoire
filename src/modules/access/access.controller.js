@@ -193,7 +193,8 @@ exports.revokeAuthorizationAccess = catchAsync(async (req, res, next) => {
   const { id } = req.params;
   const { reason } = req.body;
   
-  const revokedAuthAccess = await accessService.revokeAuthorizationAccess(id, reason);
+  // Passer l'utilisateur connecté au service
+  const revokedAuthAccess = await accessService.revokeAuthorizationAccess(id, reason, req.user);
   
   res.status(200).json({
     status: 'success',
@@ -611,4 +612,136 @@ exports.getProfessionalActiveAuthorizations = catchAsync(async (req, res, next) 
   });
 });
 
+/**
+ * Get access status for the connected patient
+ */
+exports.getPatientAccessStatus = catchAsync(async (req, res, next) => {
+  try {
+    // Récupérer l'ID du patient connecté
+    const patientId = req.user.id_patient || req.user.id;
+    
+    if (!patientId) {
+      return next(new AppError('ID du patient non identifié', 400));
+    }
 
+    console.log('🔍 [getPatientAccessStatus] Vérification du statut d\'accès pour le patient:', patientId);
+    console.log('🔍 [getPatientAccessStatus] Clause WHERE appliquée:', { patient_id: patientId });
+
+    // Récupérer UNIQUEMENT les demandes d'accès pour ce patient connecté
+    let accessRequests = await AutorisationAcces.findAll({
+      where: { 
+        patient_id: patientId // ✅ Filtrage strict par patient_id
+      },
+      include: [
+        {
+          model: require('../../models').ProfessionnelSante,
+          as: 'professionnelDemandeur', // ✅ Alias correct pour le professionnel qui demande
+          attributes: ['id_professionnel', 'nom', 'prenom', 'specialite', 'numero_adeli'],
+          include: [{
+            model: require('../../models').Utilisateur,
+            as: 'compteUtilisateur',
+            attributes: ['nom', 'prenom', 'email']
+          }]
+        },
+        {
+          model: require('../../models').ProfessionnelSante,
+          as: 'autorisateur', // ✅ Alias correct pour le professionnel qui autorise
+          attributes: ['id_professionnel', 'nom', 'prenom', 'specialite', 'numero_adeli'],
+          required: false // ✅ Optionnel car peut être null
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Vérification de sécurité : s'assurer que toutes les données appartiennent au patient connecté
+    const unauthorizedData = accessRequests.filter(req => req.patient_id !== patientId);
+    if (unauthorizedData.length > 0) {
+      console.warn('⚠️ [getPatientAccessStatus] Données non autorisées détectées:', unauthorizedData.map(req => req.patient_id));
+      // Filtrer pour ne garder que les données du patient connecté
+      accessRequests = accessRequests.filter(req => req.patient_id === patientId);
+    }
+
+    // Séparer les demandes par statut
+    const pendingRequests = accessRequests.filter(req => req.statut === 'attente_validation');
+    const activeAuthorizations = accessRequests.filter(req => req.statut === 'actif');
+    const deniedRequests = accessRequests.filter(req => req.statut === 'refuse' || req.statut === 'expire');
+
+    console.log('✅ [getPatientAccessStatus] Statut récupéré avec succès:', {
+      total: accessRequests.length,
+      pending: pendingRequests.length,
+      active: activeAuthorizations.length,
+      denied: deniedRequests.length
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        patient_id: patientId,
+        summary: {
+          total_requests: accessRequests.length,
+          pending_requests: pendingRequests.length,
+          active_authorizations: activeAuthorizations.length,
+          denied_requests: deniedRequests.length
+        },
+        accessRequests: pendingRequests,
+        activeAuthorizations: activeAuthorizations,
+        deniedRequests: deniedRequests,
+        allRequests: accessRequests
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ [getPatientAccessStatus] Erreur lors de la récupération du statut:', {
+      patientId: req.user.id_patient || req.user.id,
+      error: error.message,
+      stack: error.stack
+    });
+    return next(error);
+  }
+});
+
+/**
+ * Revoke authorization access for patients (their own authorizations only)
+ */
+exports.revokePatientAuthorization = catchAsync(async (req, res, next) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+  
+  // Récupérer l'ID du patient connecté
+  const patientId = req.user.id_patient || req.user.id;
+  
+  if (!patientId) {
+    return next(new AppError('ID du patient non identifié', 400));
+  }
+
+  try {
+    // Vérifier que l'autorisation appartient au patient connecté
+    const authAccess = await AutorisationAcces.findByPk(id);
+    if (!authAccess) {
+      return next(new AppError('Autorisation d\'accès non trouvée', 404));
+    }
+
+    if (authAccess.patient_id !== patientId) {
+      return next(new AppError('Vous ne pouvez révoquer que vos propres autorisations', 403));
+    }
+
+    // Mettre à jour l'autorisation
+    await authAccess.update({
+      statut: 'refuse', // ✅ Valeur valide de l'enum
+      motif_revocation: reason || 'Révoqué par le patient',
+      date_revocation: new Date()
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Autorisation révoquée avec succès',
+      data: {
+        authorizationAccess: authAccess,
+      },
+    });
+
+  } catch (error) {
+    console.error('❌ [revokePatientAuthorization] Erreur:', error);
+    return next(error);
+  }
+});
