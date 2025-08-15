@@ -3,6 +3,7 @@ dotenv.config({ path: './.env' });
 
 const app = require('./app');
 const { sequelize } = require('./config/database');
+const { testConnection: testRedisConnection } = require('./config/redis');
 
 const PORT = process.env.PORT || 3000;
 
@@ -16,14 +17,26 @@ process.on('uncaughtException', err => {
 // Démarrage du serveur
 const startServer = async () => {
     try {
+        // Tester la connexion à la base de données
         await sequelize.authenticate();
-        console.log('Connection to database has been established successfully.');
+        console.log('✅ Connexion à la base de données établie avec succès');
 
+        // Tester la connexion Redis
+        const redisResult = await testRedisConnection();
+        if (redisResult) {
+            console.log('✅ Redis connecté et opérationnel');
+        } else {
+            console.warn('⚠️  Redis non disponible - certaines fonctionnalités peuvent être limitées');
+        }
+
+        // Démarrer le serveur
         app.listen(PORT, () => {
-            console.log(`Server running on port: http://localhost:${PORT} in ${process.env.NODE_ENV} mode`);
+            console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+            console.log(`📱 Mode: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🔐 Authentification Redis: ${redisResult ? 'Activée' : 'Désactivée'}`);
         });
     } catch (error) {
-        console.error('Unable to connect to the database:', error);
+        console.error('❌ Erreur lors du démarrage:', error);
         process.exit(1);
     }
 };

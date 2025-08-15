@@ -3,6 +3,7 @@ const accessController = require('./access.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
 const patientAccessMiddleware = require('../../middlewares/patientAccess.middleware');
 const validationMiddleware = require('../../middlewares/validation.middleware');
+const accessMiddleware = require('../../middlewares/access.middleware');
 
 const router = express.Router();
 
@@ -702,6 +703,7 @@ router.get('/authorization/:id', accessController.getAuthorizationAccessById);
  * /access/authorization/{id}:
  *   patch:
  *     summary: Modifier une autorisation d'accès
+ *     description: Permet aux utilisateurs autorisés de modifier une autorisation d'accès (statut, raison, etc.)
  *     tags: [Access - Management]
  *     security:
  *       - bearerAuth: []
@@ -722,13 +724,24 @@ router.get('/authorization/:id', accessController.getAuthorizationAccessById);
  *               statut:
  *                 type: string
  *                 enum: [actif, inactif, attente_validation, refuse, expire]
- *                 example: "actif"
+ *                 example: "expire"
+ *                 description: Nouveau statut de l'autorisation
  *               raison_demande:
  *                 type: string
- *                 example: "Consultation mise à jour"
+ *                 example: "Médecin a quitté l'espace de santé du patient"
+ *                 description: Raison de la modification
+ *               motif_revocation:
+ *                 type: string
+ *                 example: "Révocation demandée par le patient"
+ *                 description: Motif de révocation (si applicable)
+ *               date_fin:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2024-12-31T23:59:59.000Z"
+ *                 description: Nouvelle date de fin (si applicable)
  *     responses:
  *       200:
- *         description: Autorisation mise à jour
+ *         description: Autorisation mise à jour avec succès
  *         content:
  *           application/json:
  *             schema:
@@ -737,16 +750,50 @@ router.get('/authorization/:id', accessController.getAuthorizationAccessById);
  *                 status:
  *                   type: string
  *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Autorisation mise à jour avec succès"
  *                 data:
- *                   $ref: '#/components/schemas/AutorisationAcces'
+ *                   type: object
+ *                   properties:
+ *                     authorizationAccess:
+ *                       $ref: '#/components/schemas/AutorisationAcces'
+ *                     context:
+ *                       type: object
+ *                       properties:
+ *                         patientInfo:
+ *                           type: object
+ *                           properties:
+ *                             nom:
+ *                               type: string
+ *                             prenom:
+ *                               type: string
+ *                         professionnelInfo:
+ *                           type: object
+ *                           properties:
+ *                             nom:
+ *                               type: string
+ *                             prenom:
+ *                               type: string
+ *                             specialite:
+ *                               type: string
  *       400:
- *         description: Données invalides
+ *         description: Données invalides ou ID manquant
  *       401:
- *         description: Non autorisé
+ *         description: Non authentifié
+ *       403:
+ *         description: Permissions insuffisantes
  *       404:
  *         description: Autorisation non trouvée
+ *       500:
+ *         description: Erreur serveur
  */
-router.patch('/authorization/:id', accessController.updateAuthorizationAccess);
+router.patch('/authorization/:id', 
+  authMiddleware.protect,
+  accessMiddleware.getAuthorizationContext,
+  accessMiddleware.checkAuthorizationOwnership,
+  accessController.updateAuthorizationAccess
+);
 
 /**
  * @swagger

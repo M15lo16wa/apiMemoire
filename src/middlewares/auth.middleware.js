@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { promisify } = require('util');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
+const tokenService = require('../services/tokenService');
 
 
 // Middleware pour protéger les routes (vérifie si l'utilisateur est connecté)
@@ -26,18 +27,24 @@ exports.protect = catchAsync(async (req, res, next) => {
     token = token.slice(1, -1);
   }
 
-  // 3) Vérifier la validité du token
+  // 3) Vérifier la validité du token avec Redis
   let decoded;
   try {
-    decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
-    console.log('🔍 Token décodé:', decoded);
+    // Vérifier le token dans Redis (validation + blacklist)
+    const tokenValidation = await tokenService.validateToken(token);
+    if (!tokenValidation) {
+      return next(new AppError('Token invalide ou révoqué. Veuillez vous reconnecter.', 401));
+    }
+    
+    decoded = tokenValidation;
+    console.log('🔍 Token validé avec Redis:', decoded);
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      return next(new AppError('Invalid token. Please log in again.', 401));
+      return next(new AppError('Token invalide. Veuillez vous reconnecter.', 401));
     } else if (error.name === 'TokenExpiredError') {
-      return next(new AppError('Your token has expired. Please log in again.', 401));
+      return next(new AppError('Votre token a expiré. Veuillez vous reconnecter.', 401));
     } else {
-      return next(new AppError('Token verification failed. Please log in again.', 401));
+      return next(new AppError('Échec de la vérification du token. Veuillez vous reconnecter.', 401));
     }
   }
 

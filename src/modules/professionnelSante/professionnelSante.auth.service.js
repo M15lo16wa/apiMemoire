@@ -2,21 +2,25 @@ const { ProfessionnelSante, Utilisateur } = require('../../models');
 const AppError = require('../../utils/appError');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const tokenService = require('../../services/tokenService');
 
 /**
  * Sign JWT token for professional
- * @param {number} id - Professional ID
+ * @param {Object} professional - Professional object
  * @returns {string} JWT token
  */
 const signToken = (professional) => {
-  // On encode professionnel_id, utilisateur_id et le vrai role dans le token
-  return jwt.sign({
-    professionnel_id: professional.id_professionnel,
-    utilisateur_id: professional.utilisateur_id,
-    role: professional.role // ex: 'medecin', 'infirmier', ...
-  }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
+  return jwt.sign(
+    { 
+      id: professional.id_professionnel, 
+      role: professional.role || 'professionnel_sante',
+      type: 'professionnel'
+    }, 
+    process.env.JWT_SECRET, 
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN,
+    }
+  );
 };
 
 /**
@@ -25,8 +29,9 @@ const signToken = (professional) => {
  * @param {number} statusCode - HTTP status code
  * @param {Object} res - Express response object
  */
-const createSendToken = (professional, statusCode, res) => {
-  const token = signToken(professional);
+const createSendToken = async (professional, statusCode, res) => {
+  // Générer et stocker le token avec Redis
+  const token = await tokenService.generateAndStoreToken(professional, 'professionnel');
 
   // Debug des variables d'environnement
   console.log('DEBUG COOKIE - JWT_COOKIE_EXPIRES_IN:', process.env.JWT_COOKIE_EXPIRES_IN);

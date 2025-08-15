@@ -1,170 +1,281 @@
 const authService = require('./auth.service');
-const catchAsync = require('../../utils/catchAsync');
+const tokenService = require('../../services/tokenService');
 const AppError = require('../../utils/appError');
+const catchAsync = require('../../utils/catchAsync');
+const jwt = require('jsonwebtoken');
 
-/**
- * Authenticate with CPS code
- */
-exports.authenticateCPS = catchAsync(async (req, res, next) => {
-  const { cpsCode } = req.body;
+// =================================================================
+// === AUTHENTIFICATION STANDARD ===
+// =================================================================
 
-  if (!cpsCode) {
-    return next(new AppError('Code CPS requis', 400));
+exports.register = catchAsync(async (req, res, next) => {
+  const userData = req.body;
+  const newUser = await authService.register(userData);
+  
+  res.status(201).json({
+    status: 'success',
+    message: 'Compte créé avec succès',
+    data: {
+      user: newUser
+    }
+  });
+});
+
+exports.login = catchAsync(async (req, res, next) => {
+  const { email, mot_de_passe } = req.body;
+  
+  if (!email || !mot_de_passe) {
+    return next(new AppError('Veuillez fournir un email et un mot de passe', 400));
   }
 
-  const professionnel = await authService.authenticateCPS(cpsCode);
-  const token = authService.generateAccessToken(professionnel);
+  const user = await authService.login(email, mot_de_passe);
+  await authService.sendAuthToken(user, 200, res);
+});
+
+exports.logout = catchAsync(async (req, res, next) => {
+  try {
+    let token;
+    
+    // Récupérer le token depuis les headers ou cookies
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies.jwt) {
+      token = req.cookies.jwt;
+    }
+
+    if (token) {
+      // Révoquer le token dans Redis
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.id) {
+        await tokenService.revokeToken(token, decoded.id);
+      }
+    }
+
+    // Supprimer le cookie JWT
+    res.cookie('jwt', 'loggedout', {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Déconnexion réussie'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la déconnexion:', error);
+    res.status(200).json({
+      status: 'success',
+      message: 'Déconnexion réussie'
+    });
+  }
+});
+
+exports.logoutAllDevices = catchAsync(async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return next(new AppError('Utilisateur non authentifié', 401));
+    }
+
+    // Révoquer tous les tokens de l'utilisateur
+    await tokenService.revokeAllUserTokens(req.user.id);
+
+    // Supprimer le cookie JWT
+    res.cookie('jwt', 'loggedout', {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Déconnexion de tous les appareils réussie'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la déconnexion de tous les appareils:', error);
+    return next(new AppError('Erreur lors de la déconnexion', 500));
+  }
+});
+
+// =================================================================
+// === AUTHENTIFICATION PROFESSIONNELS DE SANTÉ ===
+// =================================================================
+
+exports.loginProfessionnel = catchAsync(async (req, res, next) => {
+  const { publicIdentifier, codeCPS } = req.body;
+  
+  if (!publicIdentifier || !codeCPS) {
+    return next(new AppError('Veuillez fournir un identifiant public et un code CPS', 400));
+  }
+
+  const professionnel = await authService.authenticateProfessionnel(publicIdentifier, codeCPS);
+  
+  // Générer et stocker le token avec Redis
+  const token = await tokenService.generateAndStoreToken(professionnel, 'professionnel');
+  
+  // Définir le cookie
+  const cookieOptions = {
+    expires: new Date(
+      Date.now() + (process.env.JWT_COOKIE_EXPIRES_IN || 7) * 24 * 60 * 60 * 1000
+    ),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+  };
+
+  res.cookie('jwt', token, cookieOptions);
 
   res.status(200).json({
     status: 'success',
-    message: 'Authentification CPS réussie',
+    token,
     data: {
       professionnel: {
         id: professionnel.id_professionnel,
         nom: professionnel.nom,
         prenom: professionnel.prenom,
-        specialite: professionnel.specialite,
-        role: professionnel.role
-      },
-      token
+        role: professionnel.role,
+        specialite: professionnel.specialite
+      }
     }
   });
 });
 
-/**
- * Get access options for authenticated professional
- */
-exports.getAccessOptions = catchAsync(async (req, res, next) => {
-  // const professionnelId = req.user.id;
+exports.logoutProfessionnel = catchAsync(async (req, res, next) => {
+  try {
+    let token;
+    
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies.jwt) {
+      token = req.cookies.jwt;
+    }
+
+    if (token) {
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.id) {
+        await tokenService.revokeToken(token, decoded.id);
+      }
+    }
+
+    res.cookie('jwt', 'loggedout', {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Déconnexion professionnel réussie'
+    });
+  } catch (error) {
+    console.error('Erreur lors de la déconnexion professionnel:', error);
+    res.status(200).json({
+      status: 'success',
+      message: 'Déconnexion professionnel réussie'
+    });
+  }
+});
+
+// =================================================================
+// === AUTHENTIFICATION PATIENTS ===
+// =================================================================
+
+exports.loginPatient = catchAsync(async (req, res, next) => {
+  const { numeroSecu, dateNaissance } = req.body;
+  
+  if (!numeroSecu || !dateNaissance) {
+    return next(new AppError('Veuillez fournir un numéro de sécurité sociale et une date de naissance', 400));
+  }
+
+  const patient = await authService.authenticatePatient(numeroSecu, dateNaissance);
+  
+  // Générer et stocker le token avec Redis
+  const token = await tokenService.generateAndStoreToken(patient, 'patient');
+  
+  const cookieOptions = {
+    expires: new Date(
+      Date.now() + (process.env.JWT_COOKIE_EXPIRES_IN || 7) * 24 * 60 * 60 * 1000
+    ),
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+  };
+
+  res.cookie('jwt', token, cookieOptions);
 
   res.status(200).json({
     status: 'success',
+    token,
     data: {
-      accessOptions: [
-        {
-          id: 'demande_standard',
-          name: 'Demande d\'accès standard',
-          description: 'Demander l\'accès au dossier médical du patient',
-          requiresPatientId: true,
-          type: 'standard'
-        },
-        {
-          id: 'acces_urgence',
-          name: 'Accès en mode urgence',
-          description: 'Accès immédiat au dossier en cas d\'urgence vitale',
-          requiresPatientId: true,
-          type: 'urgence',
-          requiresJustification: true
-        },
-        {
-          id: 'acces_secret',
-          name: 'Accès secret',
-          description: 'Accès discret au dossier (traçé mais non notifié)',
-          requiresPatientId: true,
-          type: 'secret'
-        }
-      ]
+      patient: {
+        id: patient.id_patient,
+        nom: patient.nom,
+        prenom: patient.prenom,
+        dateNaissance: patient.date_naissance
+      }
     }
   });
 });
 
-exports.register = catchAsync(async (req, res, next) => {
-  // Validation des champs requis pour un utilisateur
-  const requiredFields = ['nom', 'prenom', 'email', 'mot_de_passe'];
-  const missingFields = requiredFields.filter(field => !req.body[field]);
-  
-  if (missingFields.length > 0) {
-    return next(new AppError(`Les champs suivants sont requis : ${missingFields.join(', ')}`, 400));
-  }
-
+exports.logoutPatient = catchAsync(async (req, res, next) => {
   try {
-    // Préparation des données utilisateur
-    const userData = {
-      nom: req.body.nom.trim(),
-      prenom: req.body.prenom.trim(),
-      email: req.body.email.toLowerCase().trim(),
-      mot_de_passe: req.body.mot_de_passe,
-      role: ['admin','secretaire'].includes(req.body.role) ? req.body.role : 'secretaire',
-      statut: 'actif'
-    };
-
-    // Création de l'utilisateur
-    const newUser = await authService.register(userData);
+    let token;
     
-    // Envoi de la réponse avec le token JWT
-    authService.sendAuthToken(newUser, 201, res);
-  } catch (error) {
-    // Gestion des erreurs de validation Sequelize
-    if (error.name === 'SequelizeValidationError' || error.name === 'SequelizeUniqueConstraintError') {
-      const messages = error.errors.map(err => err.message);
-      return next(new AppError(`Erreur de validation : ${messages.join('. ')}`, 400));
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies.jwt) {
+      token = req.cookies.jwt;
     }
-    next(error);
-  }
-});
 
-exports.login = catchAsync(async (req, res, next) => {
-  const { email, mot_de_passe } = req.body;
+    if (token) {
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.id) {
+        await tokenService.revokeToken(token, decoded.id);
+      }
+    }
 
-  if (!email || !mot_de_passe) {
-    return next(new AppError('Veuillez fournir un email et un mot de passe', 400));
-  }
-
-  try {
-    const user = await authService.login(email, mot_de_passe);
-    authService.sendAuthToken(user, 200, res);
-  } catch (error) {
-    next(error);
-  }
-});
-
-exports.logout = (req, res) => {
     res.cookie('jwt', 'loggedout', {
-        expires: new Date(Date.now() + 10 * 1000), // Expire dans 10 secondes pour forcer la déconnexion
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true
     });
-    res.status(200).json({ status: 'success', message: 'Logged out successfully' });
-};
 
-// Exemple de route protégée pour tester l'authentification
-// Changement de mot de passe pour patient
-const patientAuthService = require('../patient/patient.auth.service');
-
-exports.changePassword = catchAsync(async (req, res, next) => {
-  const patientId = req.user && req.user.id_patient;
-  const { mot_de_passe_actuel, nouveau_mot_de_passe } = req.body;
-
-  if (!mot_de_passe_actuel || !nouveau_mot_de_passe) {
-    return next(new AppError('Veuillez fournir votre mot de passe actuel et le nouveau mot de passe.', 400));
-  }
-  try {
-    await patientAuthService.changePatientPassword(patientId, mot_de_passe_actuel, nouveau_mot_de_passe);
     res.status(200).json({
       status: 'success',
-      message: 'Mot de passe mis à jour avec succès'
+      message: 'Déconnexion patient réussie'
     });
   } catch (error) {
-    next(error);
+    console.error('Erreur lors de la déconnexion patient:', error);
+    res.status(200).json({
+      status: 'success',
+      message: 'Déconnexion patient réussie'
+    });
   }
 });
 
-exports.getMe = (req, res, next) => {
-    // req.user est attaché par le middleware auth.protect
-    if (!req.user) {
-        return next(new AppError('User not found in request. Authentication failed.', 500));
+// =================================================================
+// === ROUTES DE GESTION DES SESSIONS ===
+// =================================================================
+
+exports.getSessionInfo = catchAsync(async (req, res, next) => {
+  if (!req.user || !req.user.id) {
+    return next(new AppError('Utilisateur non authentifié', 401));
+  }
+
+  const session = await tokenService.getUserSession(req.user.id);
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      session,
+      user: req.user
     }
-    res.status(200).json({
-        status: 'success',
-        data: {
-            user: {
-                id: req.user.id_utilisateur,
-                nom: req.user.nom,
-                prenom: req.user.prenom,
-                email: req.user.email,
-                role: req.user.role,
-            }
-        }
-    });
-};
+  });
+});
+
+exports.getRedisStats = catchAsync(async (req, res, next) => {
+  const stats = await tokenService.getStats();
+  
+  res.status(200).json({
+    status: 'success',
+    data: {
+      stats
+    }
+  });
+});

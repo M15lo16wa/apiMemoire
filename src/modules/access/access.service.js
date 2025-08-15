@@ -96,12 +96,34 @@ exports.getAuthorizationAccessById = async (id) => {
  * @returns {Object} Updated Authorization Access
  */
 exports.updateAuthorizationAccess = async (id, updateData) => {
+  console.log('🔄 [service.updateAuthorizationAccess] Mise à jour autorisation', { id, updateData });
+  
   const authAccess = await AutorisationAcces.findByPk(id);
   if (!authAccess) {
     throw new AppError('Autorisation d\'accès non trouvée', 404);
   }
 
-  await authAccess.update(updateData);
+  console.log('🔍 [service.updateAuthorizationAccess] Autorisation trouvée', {
+    id: authAccess.id_acces,
+    statut_actuel: authAccess.statut,
+    professionnel_id: authAccess.professionnel_id,
+    patient_id: authAccess.patient_id
+  });
+
+  // Mise à jour avec timestamp
+  const updateDataWithTimestamp = {
+    ...updateData,
+    updatedAt: new Date()
+  };
+
+  await authAccess.update(updateDataWithTimestamp);
+  
+  console.log('✅ [service.updateAuthorizationAccess] Autorisation mise à jour', {
+    id: authAccess.id_acces,
+    nouveau_statut: authAccess.statut,
+    date_mise_a_jour: authAccess.updatedAt
+  });
+  
   return authAccess;
 };
 
@@ -363,7 +385,10 @@ exports.requestStandardAccess = async (requestData) => {
           patient_id,
           professionnel_id,
           type_notification: 'demande_acces',
+          titre: `Demande d'accès au dossier médical`,
+          contenu_notification: `Le Dr. ${professionnel.nom} ${professionnel.prenom} demande l'accès à votre dossier médical`,
           message: `Le Dr. ${professionnel.nom} ${professionnel.prenom} demande l'accès à votre dossier médical`,
+          destinataire: patient.email || patient.telephone || 'contact@dmp.fr',
           statut: 'non_lu',
           // === Lien d'autorisation pour suivre la réponse ===
           id_acces_autorisation: autorisation.id_acces 
@@ -532,6 +557,12 @@ exports.processPatientResponse = async (authorizationId, patientId, response, co
     throw new AppError('Cette demande a déjà été traitée.', 400);
   }
 
+  // Récupérer les informations du patient pour la notification
+  const patient = await Patient.findByPk(patientId);
+  if (!patient) {
+    throw new AppError('Patient non trouvé', 404);
+  }
+
   const newStatus = response === 'accept' ? 'actif' : 'refuse';
   
   await autorisation.update({
@@ -577,7 +608,11 @@ exports.processPatientResponse = async (authorizationId, patientId, response, co
     patient_id,
     professionnel_id: autorisation.professionnel_id,
     type_notification: 'reponse_acces',
+    titre: `Réponse à votre demande d'accès`,
+    contenu_notification: `Votre demande d'accès a été ${response === 'accept' ? 'acceptée' : 'refusée'}`,
     message: `Votre demande d'accès a été ${response === 'accept' ? 'acceptée' : 'refusée'}`,
+    destinataire: patient.email || patient.telephone || 'contact@dmp.fr',
+    statut: 'non_lu'
   });
 
   return { autorisation };

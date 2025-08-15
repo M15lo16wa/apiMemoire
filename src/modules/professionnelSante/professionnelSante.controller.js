@@ -69,21 +69,58 @@ exports.login = catchAsync(async (req, res, next) => {
 
   try {
     const professionnel = await professionnelAuthService.loginProfessionnel(numero_adeli, mot_de_passe);
-    professionnelAuthService.sendAuthToken(professionnel, 200, res);
+    await professionnelAuthService.sendAuthToken(professionnel, 200, res);
   } catch (error) {
     next(error);
   }
 });
 
-exports.logout = (req, res) => {
-  res.cookie('jwt', 'loggedout', {
-    expires: new Date(Date.now() + 10 * 1000), // Expire dans 10 secondes pour forcer la déconnexion
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-  });
-  res.status(200).json({ status: 'success', message: 'Déconnexion réussie' });
-};
+exports.logout = catchAsync(async (req, res, next) => {
+  try {
+    // Récupérer le token depuis les cookies ou headers
+    let token;
+    if (req.cookies.jwt) {
+      token = req.cookies.jwt;
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (token) {
+      // Révoquer le token dans Redis
+      if (req.user && req.user.id) {
+        const tokenService = require('../../services/tokenService');
+        await tokenService.revokeToken(token, req.user.id);
+      }
+    }
+
+    // Invalider le cookie
+    res.cookie('jwt', 'loggedout', {
+      expires: new Date(Date.now() + 10 * 1000), // Expire dans 10 secondes pour forcer la déconnexion
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    });
+
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Déconnexion réussie' 
+    });
+  } catch (error) {
+    console.error('Erreur lors de la déconnexion:', error);
+    // Même en cas d'erreur, on invalide le cookie
+    res.cookie('jwt', 'loggedout', {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    });
+    
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Déconnexion réussie' 
+    });
+  }
+});
 
 exports.changePassword = catchAsync(async (req, res, next) => {
   const professionnelId = req.professionnel && req.professionnel.id_professionnel;

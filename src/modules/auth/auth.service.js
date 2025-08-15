@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const AppError = require('../../utils/appError');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const tokenService = require('../../services/tokenService');
 
 const signToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -11,8 +12,9 @@ const signToken = (id) => {
   });
 };
 
-const createSendToken = (user, statusCode, res) => {
-  const token = signToken(user.id_utilisateur);
+const createSendToken = async (user, statusCode, res) => {
+  // Générer et stocker le token avec Redis
+  const token = await tokenService.generateAndStoreToken(user, 'utilisateur');
 
   const cookieOptions = {
     expires: new Date(

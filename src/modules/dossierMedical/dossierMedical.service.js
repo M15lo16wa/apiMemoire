@@ -1,7 +1,273 @@
 // src/modules/dossierMedical/dossierMedical.service.js
 
-const { DossierMedical, Patient, ProfessionnelSante, Utilisateur, ServiceSante, Prescription, ExamenLabo, Consultation } = require('../../models');
+const { DossierMedical, Patient, ProfessionnelSante, Utilisateur, ServiceSante, Prescription, ExamenLabo, Consultation, DocumentPersonnel } = require('../../models');
 const { Op } = require('sequelize');
+const fs = require('fs').promises;
+const path = require('path');
+
+/**
+ * Service pour la gestion des documents personnels des patients
+ */
+const documentPersonnelService = {
+    /**
+     * Upload d'un nouveau document personnel
+     * @param {object} documentData - Données du document à créer
+     * @param {number} documentData.patient_id - ID du patient
+     * @param {string} documentData.nom - Nom du document
+     * @param {string} documentData.type - Type de document (ordonnance, resultat, certificat, autre)
+     * @param {string} documentData.description - Description du document
+     * @param {string} documentData.url - Chemin du fichier uploadé
+     * @param {number} documentData.taille - Taille du fichier en bytes
+     * @param {string} documentData.format - Format du fichier
+     * @returns {Promise<DocumentPersonnel>} Le document créé
+     */
+    async uploadDocument(documentData) {
+        try {
+            // Validation des données obligatoires
+            if (!documentData.patient_id || !documentData.nom || !documentData.type) {
+                throw new Error('Les champs patient_id, nom et type sont obligatoires');
+            }
+
+            // Validation du type de document
+            const typesValides = ['ordonnance', 'resultat', 'certificat', 'general', 'autre'];
+            if (!typesValides.includes(documentData.type)) {
+                throw new Error('Type de document invalide. Types autorisés: ' + typesValides.join(', '));
+            }
+
+            // Vérifier que le patient existe
+            const patient = await Patient.findByPk(documentData.patient_id);
+            if (!patient) {
+                throw new Error('Patient non trouvé');
+            }
+
+            // Créer le document
+            const nouveauDocument = await DocumentPersonnel.create(documentData);
+            
+            console.log('✅ [documentPersonnelService.uploadDocument] Document uploadé avec succès:', nouveauDocument.id);
+            return nouveauDocument;
+        } catch (error) {
+            console.error('❌ [documentPersonnelService.uploadDocument] Erreur lors de l\'upload du document:', error);
+            throw new Error(`Impossible d'uploader le document: ${error.message}`);
+        }
+    },
+
+    /**
+     * Récupère tous les documents personnels d'un patient
+     * @param {number} patientId - ID du patient
+     * @param {object} filters - Filtres optionnels (type, date, etc.)
+     * @returns {Promise<DocumentPersonnel[]>} Liste des documents du patient
+     */
+    async getDocumentsByPatient(patientId, filters = {}) {
+        try {
+            const whereClause = { patient_id: patientId };
+            
+            // Appliquer les filtres
+            if (filters.type) {
+                whereClause.type = filters.type;
+            }
+            if (filters.date_debut && filters.date_fin) {
+                whereClause.createdAt = {
+                    [Op.between]: [filters.date_debut, filters.date_fin]
+                };
+            }
+
+            const documents = await DocumentPersonnel.findAll({
+                where: whereClause,
+                order: [['createdAt', 'DESC']],
+                include: [
+                    {
+                        model: Patient,
+                        as: 'patient',
+                        attributes: ['id_patient', 'nom', 'prenom']
+                    }
+                ]
+            });
+
+            return documents;
+        } catch (error) {
+            console.error(`❌ [documentPersonnelService.getDocumentsByPatient] Erreur lors de la récupération des documents pour le patient ${patientId}:`, error);
+            throw new Error('Impossible de récupérer les documents du patient');
+        }
+    },
+
+    /**
+     * Récupère un document personnel par son ID
+     * @param {number} documentId - ID du document
+     * @returns {Promise<DocumentPersonnel|null>} Le document ou null si non trouvé
+     */
+    async getDocumentById(documentId) {
+        try {
+            const document = await DocumentPersonnel.findByPk(documentId, {
+                include: [
+                    {
+                        model: Patient,
+                        as: 'patient',
+                        attributes: ['id_patient', 'nom', 'prenom']
+                    }
+                ]
+            });
+
+            return document;
+        } catch (error) {
+            console.error(`❌ [documentPersonnelService.getDocumentById] Erreur lors de la récupération du document ${documentId}:`, error);
+            throw new Error('Impossible de récupérer le document');
+        }
+    },
+
+    /**
+     * Met à jour un document personnel
+     * @param {number} documentId - ID du document à mettre à jour
+     * @param {object} updateData - Données de mise à jour
+     * @returns {Promise<DocumentPersonnel|null>} Le document mis à jour ou null si non trouvé
+     */
+    async updateDocument(documentId, updateData) {
+        try {
+            const document = await DocumentPersonnel.findByPk(documentId);
+            
+            if (!document) {
+                console.log('⚠️ [documentPersonnelService.updateDocument] Document non trouvé:', documentId);
+                return null;
+            }
+
+            // Validation du type si modifié
+            if (updateData.type) {
+                const typesValides = ['ordonnance', 'resultat', 'certificat', 'general', 'autre'];
+                if (!typesValides.includes(updateData.type)) {
+                    throw new Error('Type de document invalide. Types autorisés: ' + typesValides.join(', '));
+                }
+            }
+
+            await document.update(updateData);
+            
+            console.log('✅ [documentPersonnelService.updateDocument] Document mis à jour avec succès:', documentId);
+            return document;
+        } catch (error) {
+            console.error(`❌ [documentPersonnelService.updateDocument] Erreur lors de la mise à jour du document ${documentId}:`, error);
+            throw new Error(`Impossible de mettre à jour le document: ${error.message}`);
+        }
+    },
+
+    /**
+     * Supprime un document personnel
+     * @param {number} documentId - ID du document à supprimer
+     * @returns {Promise<boolean>} True si supprimé avec succès
+     */
+    async deleteDocument(documentId) {
+        try {
+            const document = await DocumentPersonnel.findByPk(documentId);
+            
+            if (!document) {
+                console.log('⚠️ [documentPersonnelService.deleteDocument] Document non trouvé:', documentId);
+                return false;
+            }
+
+            // Supprimer l'enregistrement de la base (le contenu est automatiquement supprimé)
+            await document.destroy();
+            
+            console.log('✅ [documentPersonnelService.deleteDocument] Document supprimé avec succès:', documentId);
+            return true;
+        } catch (error) {
+            console.error(`❌ [documentPersonnelService.deleteDocument] Erreur lors de la suppression du document ${documentId}:`, error);
+            throw new Error(`Impossible de supprimer le document: ${error.message}`);
+        }
+    },
+
+    /**
+     * Récupère les statistiques des documents d'un patient
+     * @param {number} patientId - ID du patient
+     * @returns {Promise<object>} Statistiques des documents
+     */
+    async getDocumentStats(patientId) {
+        try {
+            const [totalDocuments, documentsParType] = await Promise.all([
+                DocumentPersonnel.count({ where: { patient_id: patientId } }),
+                DocumentPersonnel.findAll({
+                    where: { patient_id: patientId },
+                    attributes: [
+                        'type',
+                        [sequelize.literal('COUNT(*)'), 'count']
+                    ],
+                    group: ['type'],
+                    raw: true
+                })
+            ]);
+
+            const stats = {
+                total_documents: totalDocuments,
+                par_type: documentsParType.reduce((acc, item) => {
+                    acc[item.type] = parseInt(item.count);
+                    return acc;
+                }, {}),
+                taille_totale: await DocumentPersonnel.sum('taille', { where: { patient_id: patientId } }) || 0
+            };
+
+            return stats;
+        } catch (error) {
+            console.error(`❌ [documentPersonnelService.getDocumentStats] Erreur lors de la récupération des statistiques pour le patient ${patientId}:`, error);
+            throw new Error('Impossible de récupérer les statistiques des documents');
+        }
+    },
+
+    /**
+     * Recherche de documents par critères
+     * @param {object} searchCriteria - Critères de recherche
+     * @param {number} searchCriteria.patient_id - ID du patient (optionnel)
+     * @param {string} searchCriteria.nom - Nom du document (recherche partielle)
+     * @param {string} searchCriteria.type - Type de document
+     * @param {string} searchCriteria.description - Description (recherche partielle)
+     * @param {string} searchCriteria.date_debut - Date de début de création
+     * @param {string} searchCriteria.date_fin - Date de fin de création
+     * @returns {Promise<DocumentPersonnel[]>} Documents correspondant aux critères
+     */
+    async searchDocuments(searchCriteria) {
+        try {
+            const whereClause = {};
+            
+            if (searchCriteria.patient_id) {
+                whereClause.patient_id = searchCriteria.patient_id;
+            }
+            
+            if (searchCriteria.nom) {
+                whereClause.nom = {
+                    [Op.iLike]: `%${searchCriteria.nom}%`
+                };
+            }
+            
+            if (searchCriteria.type) {
+                whereClause.type = searchCriteria.type;
+            }
+            
+            if (searchCriteria.description) {
+                whereClause.description = {
+                    [Op.iLike]: `%${searchCriteria.description}%`
+                };
+            }
+            
+            if (searchCriteria.date_debut && searchCriteria.date_fin) {
+                whereClause.createdAt = {
+                    [Op.between]: [searchCriteria.date_debut, searchCriteria.date_fin]
+                };
+            }
+
+            const documents = await DocumentPersonnel.findAll({
+                where: whereClause,
+                include: [
+                    {
+                        model: Patient,
+                        as: 'patient',
+                        attributes: ['id_patient', 'nom', 'prenom']
+                    }
+                ],
+                order: [['createdAt', 'DESC']]
+            });
+
+            return documents;
+        } catch (error) {
+            console.error('❌ [documentPersonnelService.searchDocuments] Erreur lors de la recherche de documents:', error);
+            throw new Error('Impossible de rechercher les documents');
+        }
+    }
+};
 
 const dossierMedicalService = {
 
@@ -160,22 +426,34 @@ async getDossierById(id_dossier, includes = []) {
 },
 
 /**
- *  Met à jour un dossier médical.
- *  @param {number} id_dossier - L'ID du dossier à mettre à jour.
- *  @param {object} updateData - Données de mise à jour.
- *  @returns {Promise<DossierMedical|null>} Le dossier mis à jour ou null si non trouvé.
- * */
-
+ * Met à jour un dossier médical existant.
+ * @param {number} id_dossier - L'ID du dossier à mettre à jour.
+ * @param {object} updateData - Données de mise à jour.
+ * @returns {Promise<DossierMedical|null>} Le dossier mis à jour ou null si non trouvé.
+ */
 async updateDossier(id_dossier, updateData) {
     try {
+        // Validation de l'ID
+        if (!id_dossier || isNaN(id_dossier) || id_dossier <= 0) {
+            console.error('❌ [updateDossier] ID invalide:', id_dossier);
+            throw new Error('ID du dossier médical invalide');
+        }
+        
+        console.log('🔍 [updateDossier] Recherche du dossier:', id_dossier);
         const dossier = await DossierMedical.findByPk(id_dossier);
+        
         if (!dossier) {
-        return null;
-    }
-    await dossier.update(updateData);
-    return dossier;
+            console.log('⚠️ [updateDossier] Dossier non trouvé:', id_dossier);
+            return null;
+        }
+        
+        console.log('✅ [updateDossier] Dossier trouvé, mise à jour en cours...');
+        await dossier.update(updateData);
+        
+        console.log('✅ [updateDossier] Dossier mis à jour avec succès:', id_dossier);
+        return dossier;
     } catch (error) {
-        console.error(`Erreur lors de la mise à jour du dossier médical avec l'ID ${id_dossier}:`, error);
+        console.error(`❌ [updateDossier] Erreur lors de la mise à jour du dossier médical avec l'ID ${id_dossier}:`, error);
         throw new Error('Impossible de mettre à jour le dossier médical.');
     }
 },
@@ -288,7 +566,28 @@ async getDossierCompletPatient(patientId) {
         });
 
         if (!dossier) {
-            throw new Error('Dossier médical non trouvé pour ce patient.');
+            console.log('⚠️ [service.getDossierCompletPatient] Aucun dossier médical trouvé pour le patient', patientId, '- Retour d\'une réponse vide');
+            
+            // Retourner une réponse indiquant qu'aucun dossier n'existe
+            return {
+                status: 'success',
+                message: 'Aucun dossier médical trouvé pour ce patient',
+                data: {
+                    dossier: null,
+                    prescriptions_actives: [],
+                    examens_recents: [],
+                    consultations_recentes: [],
+                    demandes_en_attente: [],
+                    resultats_anormaux: [],
+                    resume: {
+                        nombre_prescriptions_actives: 0,
+                        nombre_examens_recents: 0,
+                        nombre_consultations_recentes: 0,
+                        nombre_demandes_en_attente: 0,
+                        nombre_resultats_anormaux: 0
+                    }
+                }
+            };
         }
 
         console.log('✅ [service.getDossierCompletPatient] Dossier principal trouvé, récupération des données associées...');
@@ -388,18 +687,22 @@ async getDossierCompletPatient(patientId) {
 
         // Construire le dossier complet
         const dossierComplet = {
-            dossier: dossier,
-            prescriptions_actives: prescriptions,
-            examens_recents: examens,
-            consultations_recentes: consultations,
-            demandes_en_attente: demandesEnAttente,
-            resultats_anormaux: resultatsAnormaux,
-            resume: {
-                nombre_prescriptions_actives: prescriptions.length,
-                nombre_examens_recents: examens.length,
-                nombre_consultations_recentes: consultations.length,
-                nombre_demandes_en_attente: demandesEnAttente.length,
-                nombre_resultats_anormaux: resultatsAnormaux.length
+            status: 'success',
+            message: 'Dossier médical complet récupéré avec succès',
+            data: {
+                dossier: dossier,
+                prescriptions_actives: prescriptions,
+                examens_recents: examens,
+                consultations_recentes: consultations,
+                demandes_en_attente: demandesEnAttente,
+                resultats_anormaux: resultatsAnormaux,
+                resume: {
+                    nombre_prescriptions_actives: prescriptions.length,
+                    nombre_examens_recents: examens.length,
+                    nombre_consultations_recentes: consultations.length,
+                    nombre_demandes_en_attente: demandesEnAttente.length,
+                    nombre_resultats_anormaux: resultatsAnormaux.length
+                }
             }
         };
 
@@ -495,5 +798,8 @@ async getResumePatient(patientId) {
     }
 }
 };
+
+// Exposer le service des documents personnels
+dossierMedicalService.documentPersonnel = documentPersonnelService;
 
 module.exports = dossierMedicalService;

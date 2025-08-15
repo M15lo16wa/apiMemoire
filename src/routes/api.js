@@ -10,6 +10,7 @@ const rendezVousRoutes = require('../modules/rendezVous/rendezVous.route');
 const prescriptionRoutes = require('../modules/prescription/prescription.route');
 const examenLaboRoutes = require('../modules/examenLabo/examenLabo.route');
 const accessRoutes = require('../modules/access/access.route');
+const documentPersonnelRoutes = require('../modules/dossierMedical/documentPersonnel.route');
 
 const router = express.Router();
 
@@ -24,5 +25,6 @@ router.use('/consultation', consultationRoutes);
 router.use('/rendez-vous', rendezVousRoutes);
 router.use('/prescription', prescriptionRoutes);
 router.use('/examen-labo', examenLaboRoutes);
+router.use('/documents', documentPersonnelRoutes);
 
 module.exports = router;

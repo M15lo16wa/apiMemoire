@@ -19,17 +19,19 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING(255),
       allowNull: false
     },
-    type: {
-      type: DataTypes.ENUM('ordonnance', 'resultat', 'certificat', 'autre'),
-      allowNull: false
-    },
+          type: {
+        type: DataTypes.ENUM('ordonnance', 'resultat', 'certificat', 'general', 'autre'),
+        allowNull: false,
+        comment: 'Type de document (ordonnance, resultat, certificat, general, autre)'
+      },
     description: {
       type: DataTypes.TEXT,
       allowNull: true
     },
     url: {
       type: DataTypes.STRING(500),
-      allowNull: false
+      allowNull: true,
+      comment: 'URL du fichier (optionnel, car le contenu est stocké en base64)'
     },
     taille: {
       type: DataTypes.INTEGER,
@@ -38,6 +40,11 @@ module.exports = (sequelize) => {
     format: {
       type: DataTypes.STRING(10),
       allowNull: true
+    },
+    contenu: {
+      type: DataTypes.TEXT('long'),
+      allowNull: false,
+      comment: 'Contenu du fichier encodé en base64'
     }
   }, {
     tableName: 'documents_personnels',

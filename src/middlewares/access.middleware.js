@@ -1,4 +1,4 @@
-const { AutorisationAcces } = require('../models');
+const { AutorisationAcces, Patient, ProfessionnelSante } = require('../models');
 const accessService = require('../modules/access/access.service');
 const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
@@ -54,7 +54,6 @@ exports.verifyDMPAccessToken = catchAsync(async (req, res, next) => {
   }
 });
 
-// --- VERSION ADAPTÉE DE VOTRE MIDDLEWARE ---
 /**
  * Middleware pour vérifier si le professionnel connecté a une autorisation d'accès
  * active pour le patient demandé, en utilisant le service d'accès.
@@ -64,7 +63,20 @@ exports.checkMedicalRecordAccess = catchAsync(async (req, res, next) => {
     const userId = req.user.id;
     const userRole = req.user.role;
     const userType = req.user.type;
-    const patientId = req.params.patient_id || req.params.patientId || req.body.patient_id;
+    
+    // Récupérer l'ID du patient depuis différents endroits possibles
+    let patientId = req.params.patient_id || req.params.patientId || req.body.patient_id;
+    
+    // Si pas d'ID dans les paramètres/body, essayer de le récupérer depuis le token JWT
+    if (!patientId) {
+        patientId = req.user.patient_id || req.user.id_patient || req.user.id;
+    }
+
+    // Pour les routes comme /api/documents/patient, si c'est un patient qui accède à ses propres données
+    // et qu'aucun ID n'est spécifié, utiliser l'ID du patient connecté
+    if (!patientId && (userRole === 'patient' || userType === 'patient')) {
+        patientId = req.user.id;
+    }
 
     if (!patientId) {
         return next(new AppError('ID du patient manquant pour la vérification d\'accès.', 400));
@@ -210,3 +222,141 @@ exports.requireHealthcareProfessional = catchAsync(async (req, res, next) => {
 
   next();
 });
+
+/**
+ * Middleware pour récupérer l'identifiant du patient et du médecin concernés par l'autorisation
+ * Permet une révocation plus propre et sécurisée
+ */
+exports.getAuthorizationContext = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id || id === 'null' || id === 'undefined') {
+      return next(new AppError('ID de l\'autorisation requis et valide', 400));
+    }
+    
+    // Conversion en nombre
+    const authorizationId = parseInt(id, 10);
+    if (isNaN(authorizationId) || authorizationId <= 0) {
+      return next(new AppError('ID de l\'autorisation doit être un nombre valide', 400));
+    }
+    
+    console.log(`🔍 [getAuthorizationContext] Récupération du contexte de l'autorisation ${authorizationId}`);
+    
+    // Récupérer l'autorisation avec les relations
+    // Les modèles sont déjà importés en haut du fichier
+    
+    const autorisation = await AutorisationAcces.findByPk(authorizationId, {
+      include: [
+        {
+          model: Patient,
+          as: 'patientConcerne',
+          attributes: ['id_patient', 'nom', 'prenom', 'date_naissance']
+        },
+        {
+          model: ProfessionnelSante,
+          as: 'professionnelDemandeur',
+          attributes: ['id_professionnel', 'nom', 'prenom', 'specialite', 'numero_adeli']
+        }
+      ]
+    });
+    
+    if (!autorisation) {
+      return next(new AppError('Autorisation d\'accès non trouvée', 404));
+    }
+    
+    // Ajouter le contexte de l'autorisation à la requête
+    req.authorizationContext = {
+      autorisation: autorisation,
+      patientId: autorisation.patient_id,
+      professionnelId: autorisation.professionnel_id,
+      currentStatut: autorisation.statut,
+      patientInfo: autorisation.patientConcerne,
+      professionnelInfo: autorisation.professionnelDemandeur
+    };
+    
+    console.log(`✅ [getAuthorizationContext] Contexte récupéré:`, {
+      autorisationId: autorisation.id_acces,
+      patientId: autorisation.patient_id,
+      professionnelId: autorisation.professionnel_id,
+      statut: autorisation.statut,
+      patient: `${autorisation.patientConcerne?.nom} ${autorisation.patientConcerne?.prenom}`,
+      professionnel: `${autorisation.professionnelDemandeur?.nom} ${autorisation.professionnelDemandeur?.prenom}`
+    });
+    
+    next();
+    
+  } catch (error) {
+    console.error('❌ [getAuthorizationContext] Erreur:', error);
+    return next(new AppError('Erreur lors de la récupération du contexte de l\'autorisation', 500));
+  }
+};
+
+/**
+ * Middleware pour vérifier que l'utilisateur connecté peut modifier cette autorisation
+ * Basé sur le contexte récupéré par getAuthorizationContext
+ */
+exports.checkAuthorizationOwnership = (req, res, next) => {
+  try {
+    const { authorizationContext } = req;
+    const { user } = req;
+    
+    if (!authorizationContext) {
+      return next(new AppError('Contexte de l\'autorisation non disponible', 500));
+    }
+    
+    if (!user) {
+      return next(new AppError('Utilisateur non authentifié', 401));
+    }
+    
+    console.log(`🔒 [checkAuthorizationOwnership] Vérification des permissions:`, {
+      userId: user.id,
+      userRole: user.role,
+      professionnelId: authorizationContext.professionnelId,
+      patientId: authorizationContext.patientId
+    });
+    
+    // Vérifier les permissions selon le rôle
+    let hasPermission = false;
+    
+    if (user.role === 'admin') {
+      // Les admins peuvent tout modifier
+      hasPermission = true;
+      console.log('✅ [checkAuthorizationOwnership] Admin - Accès autorisé');
+      
+    } else if (user.role === 'medecin' || user.role === 'infirmier') {
+      // Les professionnels peuvent modifier leurs propres autorisations
+      if (user.id_professionnel === authorizationContext.professionnelId || 
+          user.id === authorizationContext.professionnelId) {
+        hasPermission = true;
+        console.log('✅ [checkAuthorizationOwnership] Professionnel - Accès autorisé (propre autorisation)');
+      } else {
+        console.log('❌ [checkAuthorizationOwnership] Professionnel - Accès refusé (autorisation d\'un autre)');
+      }
+      
+    } else if (user.role === 'patient') {
+      // Les patients peuvent modifier les autorisations les concernant
+      if (user.id_patient === authorizationContext.patientId || 
+          user.id === authorizationContext.patientId) {
+        hasPermission = true;
+        console.log('✅ [checkAuthorizationOwnership] Patient - Accès autorisé (propre dossier)');
+      } else {
+        console.log('❌ [checkAuthorizationOwnership] Patient - Accès refusé (dossier d\'un autre)');
+      }
+      
+    } else {
+      console.log('❌ [checkAuthorizationOwnership] Rôle non reconnu:', user.role);
+    }
+    
+    if (!hasPermission) {
+      return next(new AppError('Vous n\'avez pas les permissions pour modifier cette autorisation', 403));
+    }
+    
+    console.log('✅ [checkAuthorizationOwnership] Permissions vérifiées avec succès');
+    next();
+    
+  } catch (error) {
+    console.error('❌ [checkAuthorizationOwnership] Erreur:', error);
+    return next(new AppError('Erreur lors de la vérification des permissions', 500));
+  }
+};

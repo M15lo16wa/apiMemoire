@@ -175,13 +175,101 @@ exports.getAuthorizationAccessById = catchAsync(async (req, res, next) => {
  */
 exports.updateAuthorizationAccess = catchAsync(async (req, res, next) => {
   const { id } = req.params;
+  const updateData = req.body;
+  const { authorizationContext } = req;
   
-  const updatedAuthAccess = await accessService.updateAuthorizationAccess(id, req.body);
+  console.log('🔄 [updateAuthorizationAccess] Mise à jour autorisation', {
+    id,
+    updateData,
+    user: req.user?.role,
+    userId: req.user?.id,
+    context: {
+      patientId: authorizationContext?.patientId,
+      professionnelId: authorizationContext?.professionnelId,
+      currentStatut: authorizationContext?.currentStatut
+    }
+  });
+  
+  // Validation des données de mise à jour
+  if (updateData.statut && !['actif', 'inactif', 'attente_validation', 'refuse', 'expire'].includes(updateData.statut)) {
+    return next(new AppError('Statut invalide. Valeurs autorisées: actif, inactif, attente_validation, refuse, expire', 400));
+  }
+  
+  // Validation spécifique pour le statut 'expire'
+  if (updateData.statut === 'expire') {
+    if (!updateData.raison_demande && !updateData.motif_revocation) {
+      return next(new AppError('Une raison est requise lors de l\'expiration d\'une autorisation', 400));
+    }
+    
+    // Si le statut passe à 'expire', mettre à jour automatiquement la date de fin
+    if (!updateData.date_fin) {
+      updateData.date_fin = new Date();
+    }
+    
+    console.log('📅 [updateAuthorizationAccess] Expiration automatique configurée:', {
+      date_fin: updateData.date_fin,
+      raison: updateData.raison_demande || updateData.motif_revocation
+    });
+  }
+  
+  // Ajouter des informations de traçabilité
+  const updateDataWithTrace = {
+    ...updateData,
+    updatedBy: req.user?.id,
+    updatedAt: new Date()
+  };
+  
+  const updatedAuthAccess = await accessService.updateAuthorizationAccess(id, updateDataWithTrace);
+  
+  console.log('✅ [updateAuthorizationAccess] Autorisation mise à jour avec succès', {
+    id,
+    oldStatut: authorizationContext?.currentStatut,
+    newStatut: updatedAuthAccess.statut,
+    updatedBy: req.user?.id,
+    patient: `${authorizationContext?.patientInfo?.nom} ${authorizationContext?.patientInfo?.prenom}`,
+    professionnel: `${authorizationContext?.professionnelInfo?.nom} ${authorizationContext?.professionnelInfo?.prenom}`
+  });
+  
+  // Créer un historique de la modification
+  try {
+    const historyData = {
+      date_heure_acces: new Date(),
+      action: 'modification_autorisation',
+      type_ressource: 'AutorisationAcces',
+      id_ressource: id,
+      details: `Modification de l'autorisation ${id} - Statut: ${authorizationContext?.currentStatut} → ${updatedAuthAccess.statut}`,
+      statut: 'SUCCES',
+      professionnel_id: authorizationContext?.professionnelId,
+      id_patient: authorizationContext?.patientId,
+      adresse_ip: req.ip || req.connection.remoteAddress,
+      user_agent: req.get('User-Agent'),
+      id_utilisateur: req.user?.id,
+      createdBy: req.user?.id
+    };
+    
+    await accessService.createHistoryAccess(historyData);
+    console.log('📝 [updateAuthorizationAccess] Historique créé avec succès');
+    
+  } catch (historyError) {
+    console.warn('⚠️ [updateAuthorizationAccess] Erreur lors de la création de l\'historique:', historyError.message);
+    // Ne pas faire échouer la mise à jour à cause de l'historique
+  }
   
   res.status(200).json({
     status: 'success',
+    message: 'Autorisation mise à jour avec succès',
     data: {
       authorizationAccess: updatedAuthAccess,
+      context: {
+        patientInfo: authorizationContext?.patientInfo,
+        professionnelInfo: authorizationContext?.professionnelInfo,
+        modificationDetails: {
+          oldStatut: authorizationContext?.currentStatut,
+          newStatut: updatedAuthAccess.statut,
+          updatedBy: req.user?.id,
+          updatedAt: updatedAuthAccess.updatedAt
+        }
+      }
     },
   });
 });

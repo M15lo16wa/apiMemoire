@@ -2,6 +2,7 @@ const patientService = require('./patient.service');
 const patientAuthService = require('./patient.auth.service');
 const catchAsync = require('../../utils/catchAsync');
 const accessService = require('../access/access.service');
+const tokenService = require('../../services/tokenService');
 
 const AppError = require('../../utils/appError');
 
@@ -83,21 +84,88 @@ exports.login = catchAsync(async (req, res, next) => {
 
   try {
     const patient = await patientAuthService.loginPatient(numero_assure, mot_de_passe);
-    patientAuthService.sendAuthToken(patient, 200, res);
+    await patientAuthService.sendAuthToken(patient, 200, res);
   } catch (error) {
     next(error);
   }
 });
 
-exports.logout = (req, res) => {
-  res.cookie('jwt', 'loggedout', {
-    expires: new Date(Date.now() + 10 * 1000), // Expire dans 10 secondes pour forcer la déconnexion
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-  });
-  res.status(200).json({ status: 'success', message: 'Déconnexion réussie' });
-};
+exports.logout = catchAsync(async (req, res, next) => {
+  try {
+    console.log('🔍 DEBUG logout - Début de la fonction logout');
+    
+    // Récupérer le token depuis les cookies ou headers
+    let token;
+    if (req.cookies.jwt) {
+      token = req.cookies.jwt;
+      console.log('🔍 DEBUG logout - Token trouvé dans les cookies');
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+      console.log('🔍 DEBUG logout - Token trouvé dans les headers Authorization');
+    } else {
+      console.log('🔍 DEBUG logout - Aucun token trouvé');
+    }
+
+    console.log('🔍 DEBUG logout - Token extrait:', token ? token.substring(0, 30) + '...' : 'Aucun token');
+
+    if (token) {
+      try {
+        // Décoder le token JWT pour extraire l'ID utilisateur
+        const jwt = require('jsonwebtoken');
+        const decoded = jwt.decode(token);
+        
+        if (decoded && decoded.id) {
+          const userId = decoded.id;
+          console.log(`🔍 DEBUG logout - ID utilisateur extrait du token: ${userId}`);
+          console.log(`🔍 DEBUG logout - Type utilisateur: ${decoded.type}, Rôle: ${decoded.role}`);
+          
+          // Appeler tokenService.revokeToken
+          console.log(`🔍 DEBUG logout - Appel de tokenService.revokeToken pour l'utilisateur ID: ${userId}`);
+          const revokeResult = await tokenService.revokeToken(token, userId);
+          console.log(`🔍 DEBUG logout - Résultat de la révocation:`, revokeResult);
+          
+          if (revokeResult) {
+            console.log('✅ DEBUG logout - Token révoqué avec succès dans Redis');
+          } else {
+            console.log('❌ DEBUG logout - Échec de la révocation du token');
+          }
+        } else {
+          console.log('⚠️  DEBUG logout - Impossible de décoder le token ou ID manquant');
+        }
+      } catch (decodeError) {
+        console.error('❌ DEBUG logout - Erreur lors du décodage du token:', decodeError.message);
+      }
+    }
+
+    // Invalider le cookie
+    res.cookie('jwt', 'loggedout', {
+      expires: new Date(Date.now() + 10 * 1000), // Expire dans 10 secondes pour forcer la déconnexion
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    });
+
+    console.log('🔍 DEBUG logout - Cookie invalidé, envoi de la réponse');
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Déconnexion réussie' 
+    });
+  } catch (error) {
+    console.error('❌ DEBUG logout - Erreur lors de la déconnexion:', error);
+    // Même en cas d'erreur, on invalide le cookie
+    res.cookie('jwt', 'loggedout', {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    });
+    
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Déconnexion réussie' 
+    });
+  }
+});
 
 exports.changePassword = catchAsync(async (req, res, next) => {
   const patientId = req.patient && req.patient.id_patient;

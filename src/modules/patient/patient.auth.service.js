@@ -2,6 +2,7 @@ const { Patient } = require('../../models');
 const AppError = require('../../utils/appError');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const tokenService = require('../../services/tokenService');
 
 /**
  * Sign JWT token for patient
@@ -20,30 +21,47 @@ const signToken = (id) => {
  * @param {number} statusCode - HTTP status code
  * @param {Object} res - Express response object
  */
-const createSendToken = (patient, statusCode, res) => {
-  const token = signToken(patient.id_patient);
-
-  const cookieOptions = {
-    expires: new Date(
-      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-  };
-
-  res.cookie('jwt', token, cookieOptions);
-
-  // Remove password from output
-  patient.mot_de_passe = undefined;
-
-  res.status(statusCode).json({
-    status: 'success',
-    token,
-    data: {
-      patient,
-    },
+const createSendToken = async (patient, statusCode, res) => {
+  console.log('🔍 DEBUG createSendToken - Patient reçu:', {
+    id_patient: patient.id_patient,
+    nom: patient.nom,
+    prenom: patient.prenom,
+    numero_assure: patient.numero_assure,
+    hasPassword: !!patient.mot_de_passe
   });
+
+  try {
+    // Générer et stocker le token avec Redis
+    console.log('🔍 DEBUG - Appel de tokenService.generateAndStoreToken...');
+    const token = await tokenService.generateAndStoreToken(patient, 'patient');
+    console.log('🔍 DEBUG - Token généré avec succès:', token ? token.substring(0, 20) + '...' : 'Aucun token');
+
+    const cookieOptions = {
+      expires: new Date(
+        Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
+      ),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
+    };
+
+    res.cookie('jwt', token, cookieOptions);
+
+    // Remove password from output
+    patient.mot_de_passe = undefined;
+
+    console.log('🔍 DEBUG - Envoi de la réponse avec token');
+    res.status(statusCode).json({
+      status: 'success',
+      token,
+      data: {
+        patient,
+      },
+    });
+  } catch (error) {
+    console.error('❌ ERREUR dans createSendToken:', error);
+    throw error;
+  }
 };
 
 /**
