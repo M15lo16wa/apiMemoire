@@ -4,6 +4,7 @@ const authMiddleware = require('../../middlewares/auth.middleware');
 const patientAccessMiddleware = require('../../middlewares/patientAccess.middleware');
 const validationMiddleware = require('../../middlewares/validation.middleware');
 const accessMiddleware = require('../../middlewares/access.middleware');
+const { force2FAVerification } = require('../../middlewares/global2FA.middleware');
 
 const router = express.Router();
 
@@ -60,7 +61,7 @@ router.use(authMiddleware.protect);
  *       404:
  *         description: Patient non trouvé
  */
-router.post('/request-standard', accessController.requestStandardAccess);
+router.post('/request-standard', force2FAVerification, accessController.requestStandardAccess);
 
 // --- NOUVELLE ROUTE AJOUTÉE ICI ---
 /**
@@ -212,7 +213,7 @@ router.get(
  *       404:
  *         description: Patient non trouvé
  */
-router.post('/grant-emergency', accessController.grantEmergencyAccess);
+router.post('/grant-emergency', force2FAVerification, accessController.grantEmergencyAccess);
 
 /**
  * @swagger

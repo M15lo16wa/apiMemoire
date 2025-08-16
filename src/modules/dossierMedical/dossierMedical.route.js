@@ -7,6 +7,8 @@ const dossierMedicalController = require('./dossierMedical.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
 const { authenticateToken } = require('../../middlewares/auth.middleware');
 const { checkMedicalRecordAccess, logMedicalRecordAccess } = require('../../middlewares/access.middleware');
+const { validateDossierMedicalId, validatePatientId } = require('../../middlewares/paramValidation.middleware');
+// La 2FA ne s'applique qu'à l'accès aux dossiers patients, pas à la gestion des dossiers
 
 /**
  * @swagger
@@ -513,11 +515,13 @@ router.get('/',
 
 router.get('/:id', 
     authenticateToken, 
+    validateDossierMedicalId, // Nouveau middleware de validation
     dossierMedicalController.getDossierById
 );
 
 router.put('/:id', 
     authenticateToken, 
+    validateDossierMedicalId, // Nouveau middleware de validation
     updateDossierValidationRules, 
     handleValidationErrors, 
     dossierMedicalController.updateDossier
@@ -525,12 +529,14 @@ router.put('/:id',
 
 router.delete('/:id', 
     authenticateToken, 
+    validateDossierMedicalId, // Nouveau middleware de validation
     dossierMedicalController.deleteDossier
 );
 
 // Routes pour le partage patient-médecin avec middleware d'accès
 router.get('/patient/:patient_id/complet', 
     authenticateToken, // 1. Vérifie le token
+    validatePatientId, // Nouveau middleware de validation
     checkMedicalRecordAccess, // 2. Vérifie si l'accès au DMP de ce patient est autorisé
     logMedicalRecordAccess, // 3. Log l'accès
     dossierMedicalController.getDossierCompletPatient // 4. Exécute la logique finale
@@ -538,6 +544,7 @@ router.get('/patient/:patient_id/complet',
 
 router.get('/patient/:patient_id/resume', 
     authenticateToken, // 1. Vérifie le token
+    validatePatientId, // Nouveau middleware de validation
     checkMedicalRecordAccess, // 2. Vérifie si l'accès au DMP de ce patient est autorisé
     logMedicalRecordAccess, // 3. Log l'accès
     dossierMedicalController.getResumePatient // 4. Exécute la logique finale

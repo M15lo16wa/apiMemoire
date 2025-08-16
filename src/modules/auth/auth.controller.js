@@ -3,6 +3,7 @@ const tokenService = require('../../services/tokenService');
 const AppError = require('../../utils/appError');
 const catchAsync = require('../../utils/catchAsync');
 const jwt = require('jsonwebtoken');
+const TwoFactorService = require('../../services/twoFactorService');
 
 // =================================================================
 // === AUTHENTIFICATION STANDARD ===
@@ -276,6 +277,204 @@ exports.getRedisStats = catchAsync(async (req, res, next) => {
     status: 'success',
     data: {
       stats
+    }
+  });
+});
+
+// =================================================================
+// === ROUTES 2FA (AUTHENTIFICATION À DOUBLE FACTEUR) ===
+// =================================================================
+
+/**
+ * Configuration initiale du 2FA pour un utilisateur
+ */
+exports.setup2FA = catchAsync(async (req, res, next) => {
+  if (!req.user || !req.user.id) {
+    return next(new AppError('Utilisateur non authentifié', 401));
+  }
+
+  // Vérifier si le 2FA est déjà configuré
+  if (req.user.twoFactorEnabled) {
+    return next(new AppError('Le 2FA est déjà configuré pour ce compte', 400));
+  }
+
+  // Générer un nouveau secret
+  const secret = TwoFactorService.generateSecret(req.user.email);
+  
+  // Générer le QR code
+  const qrCode = await TwoFactorService.generateQRCode(
+    req.user.email, 
+    secret, 
+    'DMP Platform'
+  );
+
+  // Générer des codes de récupération
+  const recoveryCodes = TwoFactorService.generateRecoveryCodes(5);
+
+  // Stocker temporairement le secret et les codes (pas encore activé)
+  // TODO: Implémenter le stockage en base de données
+  
+  res.status(200).json({
+    status: 'success',
+    message: 'Configuration 2FA initialisée',
+    data: {
+      qrCode,
+      secret, // À retirer en production
+      recoveryCodes,
+      message: 'Scannez le QR code avec votre app authenticator, puis validez avec un code'
+    }
+  });
+});
+
+/**
+ * Validation du 2FA avec un code
+ */
+exports.verify2FA = catchAsync(async (req, res, next) => {
+  const { token } = req.body;
+  
+  if (!token) {
+    return next(new AppError('Code 2FA requis', 400));
+  }
+
+  if (!req.user.twoFactorSecret) {
+    return next(new AppError('Configuration 2FA invalide', 500));
+  }
+
+  // Vérifier le token
+  const isValid = TwoFactorService.verifyToken(token, req.user.twoFactorSecret);
+  
+  if (!isValid) {
+    return next(new AppError('Code 2FA invalide', 400));
+  }
+
+  // Activer le 2FA pour l'utilisateur
+  // TODO: Mettre à jour la base de données
+  
+  // Marquer la session comme validée
+  if (!req.session) {
+    req.session = {};
+  }
+  req.session.twoFactorVerified = true;
+
+  res.status(200).json({
+    status: 'success',
+    message: '2FA activé avec succès',
+    data: {
+      twoFactorEnabled: true
+    }
+  });
+});
+
+/**
+ * Désactivation du 2FA
+ */
+exports.disable2FA = catchAsync(async (req, res, next) => {
+  if (!req.user || !req.user.id) {
+    return next(new AppError('Utilisateur non authentifié', 401));
+  }
+
+  // TODO: Implémenter la désactivation en base de données
+  
+  res.status(200).json({
+    status: 'success',
+    message: '2FA désactivé avec succès',
+    data: {
+      twoFactorEnabled: false
+    }
+  });
+});
+
+/**
+ * Validation du 2FA pour une session
+ */
+exports.validate2FASession = catchAsync(async (req, res, next) => {
+  const { twoFactorToken } = req.body;
+  
+  if (!twoFactorToken) {
+    return next(new AppError('Code 2FA requis', 400));
+  }
+
+  if (!req.user.twoFactorSecret) {
+    return next(new AppError('Configuration 2FA invalide', 500));
+  }
+
+  // Vérifier le token
+  const isValid = TwoFactorService.verifyToken(twoFactorToken, req.user.twoFactorSecret);
+  
+  if (!isValid) {
+    return next(new AppError('Code 2FA invalide', 400));
+  }
+
+  // Marquer la session comme validée
+  if (!req.session) {
+    req.session = {};
+  }
+  req.session.twoFactorVerified = true;
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Session 2FA validée',
+    data: {
+      twoFactorVerified: true
+    }
+  });
+});
+
+/**
+ * Génération de nouveaux codes de récupération
+ */
+exports.generateRecoveryCodes = catchAsync(async (req, res, next) => {
+  if (!req.user || !req.user.id) {
+    return next(new AppError('Utilisateur non authentifié', 401));
+  }
+
+  const recoveryCodes = TwoFactorService.generateRecoveryCodes(5);
+  
+  // TODO: Mettre à jour la base de données avec les nouveaux codes
+  
+  res.status(200).json({
+    status: 'success',
+    message: 'Nouveaux codes de récupération générés',
+    data: {
+      recoveryCodes
+    }
+  });
+});
+
+/**
+ * Validation d'un code de récupération
+ */
+exports.verifyRecoveryCode = catchAsync(async (req, res, next) => {
+  const { recoveryCode } = req.body;
+  
+  if (!recoveryCode) {
+    return next(new AppError('Code de récupération requis', 400));
+  }
+
+  if (!req.user.recoveryCodes || !Array.isArray(req.user.recoveryCodes)) {
+    return next(new AppError('Aucun code de récupération configuré', 500));
+  }
+
+  // Vérifier le code de récupération
+  const verification = TwoFactorService.verifyRecoveryCode(recoveryCode, req.user.recoveryCodes);
+  
+  if (!verification.isValid) {
+    return next(new AppError('Code de récupération invalide', 400));
+  }
+
+  // Marquer la session comme validée
+  if (!req.session) {
+    req.session = {};
+  }
+  req.session.twoFactorVerified = true;
+  req.session.recoveryCodeUsed = verification.usedCode;
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Code de récupération validé',
+    data: {
+      twoFactorVerified: true,
+      recoveryCodeUsed: verification.usedCode
     }
   });
 });

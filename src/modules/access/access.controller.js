@@ -115,12 +115,23 @@ exports.getAllHistoryAccess = catchAsync(async (req, res, next) => {
 exports.getHistoryAccessByPatient = catchAsync(async (req, res, next) => {
   const { patientId } = req.params;
   
-  if (!patientId) {
-    return next(new AppError('ID patient est requis', 400));
+  console.log('🔍 DEBUG getHistoryAccessByPatient - patientId reçu:', patientId, 'type:', typeof patientId);
+  
+  // Validation que patientId est présent et valide
+  if (!patientId || patientId === 'null' || patientId === 'undefined') {
+    return next(new AppError('ID patient est requis et doit être un nombre valide', 400));
   }
+  
+  // Validation que patientId est un nombre
+  const numericPatientId = parseInt(patientId, 10);
+  if (isNaN(numericPatientId) || numericPatientId <= 0) {
+    return next(new AppError('ID patient doit être un nombre entier positif', 400));
+  }
+  
+  console.log('🔍 DEBUG getHistoryAccessByPatient - patientId validé:', numericPatientId);
 
   const historyAccess = await HistoriqueAccess.findAll({
-    where: { id_patient: patientId },
+    where: { id_patient: numericPatientId },
     order: [['date_heure_acces', 'DESC']]
   });
   
@@ -139,11 +150,22 @@ exports.getHistoryAccessByPatient = catchAsync(async (req, res, next) => {
 exports.getAuthorizationAccessByPatient = catchAsync(async (req, res, next) => {
   const { patientId } = req.params;
   
-  if (!patientId) {
-    return next(new AppError('ID patient est requis', 400));
+  console.log('🔍 DEBUG getAuthorizationAccessByPatient - patientId reçu:', patientId, 'type:', typeof patientId);
+  
+  // Validation que patientId est présent et valide
+  if (!patientId || patientId === 'null' || patientId === 'undefined') {
+    return next(new AppError('ID patient est requis et doit être un nombre valide', 400));
   }
+  
+  // Validation que patientId est un nombre
+  const numericPatientId = parseInt(patientId, 10);
+  if (isNaN(numericPatientId) || numericPatientId <= 0) {
+    return next(new AppError('ID patient doit être un nombre entier positif', 400));
+  }
+  
+  console.log('🔍 DEBUG getAuthorizationAccessByPatient - patientId validé:', numericPatientId);
 
-  const authAccess = await accessService.getAuthorizationAccessByPatient(patientId);
+  const authAccess = await accessService.getAuthorizationAccessByPatient(numericPatientId);
   
   res.status(200).json({
     status: 'success',

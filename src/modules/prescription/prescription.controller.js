@@ -730,8 +730,23 @@ class PrescriptionController {
       const { patient_id } = req.params;
       const { page, limit, statut } = req.query;
 
+      console.log('🔍 DEBUG getNotificationsPatient - patient_id reçu:', patient_id, 'type:', typeof patient_id);
+
+      // Validation que patient_id est présent et valide
+      if (!patient_id || patient_id === 'null' || patient_id === 'undefined') {
+        return next(new AppError('ID patient est requis et doit être un nombre valide', 400));
+      }
+
+      // Validation que patient_id est un nombre
+      const numericPatientId = parseInt(patient_id, 10);
+      if (isNaN(numericPatientId) || numericPatientId <= 0) {
+        return next(new AppError('ID patient doit être un nombre entier positif', 400));
+      }
+
+      console.log('🔍 DEBUG getNotificationsPatient - patient_id validé:', numericPatientId);
+
       const result = await PrescriptionService.getNotificationsPatient(
-        parseInt(patient_id),
+        numericPatientId,
         {
           page: parseInt(page) || 1,
           limit: parseInt(limit) || 10,

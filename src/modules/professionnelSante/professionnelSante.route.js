@@ -2,6 +2,7 @@ const express = require('express');
 const professionnelSanteController = require('./professionnelSante.controller');
 const authMiddleware = require('../../middlewares/auth.middleware');
 const medAuth = require('../../middlewares/medAuh');
+const { force2FAVerification } = require('../../middlewares/global2FA.middleware');
 
 const router = express.Router();
 

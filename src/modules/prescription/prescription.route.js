@@ -3,6 +3,7 @@ const router = express.Router();
 const PrescriptionController = require('./prescription.controller');
 const { handleValidationErrors } = require('../../middlewares/validation.middleware');
 const { authenticateToken } = require('../../middlewares/auth.middleware');
+// La 2FA ne s'applique qu'à l'accès aux dossiers patients, pas aux prescriptions
 const {
   ordonnanceValidationRules,
   demandeExamenValidationRules,

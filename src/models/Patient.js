@@ -64,6 +64,36 @@ module.exports = (sequelize) => {
       allowNull: false,
       comment: 'Mot de passe hashé du patient pour l\'authentification'
     },
+    // =================================================================
+    // === CHAMPS 2FA (AUTHENTIFICATION À DOUBLE FACTEUR) ===
+    // =================================================================
+    two_factor_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      comment: 'Indique si l\'authentification à double facteur est activée'
+    },
+    two_factor_secret: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      comment: 'Secret TOTP pour l\'authentification 2FA (chiffré)'
+    },
+    two_factor_recovery_codes: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      comment: 'Codes de récupération 2FA (chiffrés)'
+    },
+    two_factor_backup_codes_used: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: [],
+      comment: 'Codes de récupération 2FA déjà utilisés'
+    },
+    two_factor_last_used: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Date de dernière utilisation du 2FA'
+    }
     // Direct relationships from UML diagram
     // seConnecter() method will be implemented as instance method
     // creerCompte() method will be implemented as class method

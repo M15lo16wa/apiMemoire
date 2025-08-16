@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('../modules/auth/auth.route');
 const patientRoutes = require('../modules/patient/patient.route');
+const autoMesureRoutes = require('../modules/patient/autoMesure.route');
 const professionnelSanteRoutes = require('../modules/professionnelSante/professionnelSante.route');
 const dossierMedicalRoutes = require('../modules/dossierMedical/dossierMedical.route');
 const consultationRoutes = require('../modules/consultation/consultationRoutes');
@@ -15,7 +16,15 @@ const documentPersonnelRoutes = require('../modules/dossierMedical/documentPerso
 const router = express.Router();
 
 router.use('/auth', authRoutes);
+
+// ===== ROUTES SPÉCIFIQUES (AVANT LES ROUTES GÉNÉRIQUES) =====
+// Monter les routes auto-mesures AVANT les routes patient pour éviter les conflits
+router.use('/patient', autoMesureRoutes);
+
+// ===== ROUTES GÉNÉRIQUES (APRÈS LES ROUTES SPÉCIFIQUES) =====
 router.use('/patient', patientRoutes);
+
+// ===== AUTRES ROUTES =====
 router.use('/professionnelSante', professionnelSanteRoutes);
 router.use('/hopital', hopitalRoutes);
 router.use('/service-sante', serviceSanteRoutes);

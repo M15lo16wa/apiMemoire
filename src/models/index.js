@@ -25,6 +25,9 @@ const SessionAccesDMP = require('./SessionAccesDMP')(sequelize);
 const TentativeAuthentificationCPS = require('./TentativeAuthentificationCPS')(sequelize);
 const NotificationAccesDMP = require('./NotificationAccesDMP')(sequelize);
 
+// --- Modèle 2FA ---
+const Historique2FA = require('./Historique2FA')(sequelize);
+
 // 19. ExamenLabo et ProfessionnelSante (prescripteur et validateur)
 ProfessionnelSante.hasMany(ExamenLabo, { foreignKey: 'prescripteur_id', as: 'examensPrescrits', onDelete: 'SET NULL' });
 ExamenLabo.belongsTo(ProfessionnelSante, { foreignKey: 'prescripteur_id', as: 'prescripteur' });
@@ -78,6 +81,10 @@ DossierMedical.belongsTo(ProfessionnelSante, { foreignKey: 'medecin_referent_id'
 // 6.2. DossierMedical et ServiceSante (service responsable) - One-to-Many
 ServiceSante.hasMany(DossierMedical, { foreignKey: 'service_id', as: 'dossiersResponsables', onDelete: 'SET NULL' });
 DossierMedical.belongsTo(ServiceSante, { foreignKey: 'service_id', as: 'serviceResponsable' });
+
+// 6.3. Hopital et ServiceSante (One-to-Many) - Un hôpital peut avoir plusieurs services
+Hopital.hasMany(ServiceSante, { foreignKey: 'hopital_id', as: 'services', onDelete: 'CASCADE' });
+ServiceSante.belongsTo(Hopital, { foreignKey: 'hopital_id', as: 'hopital' });
 
 // 7. ProfessionnelSante et Consultation (One-to-Many)
 ProfessionnelSante.hasMany(Consultation, { foreignKey: 'professionnel_id', as: 'consultationsEffectuees', onDelete: 'SET NULL' });
@@ -192,5 +199,6 @@ module.exports = {
   Rappel,
   SessionAccesDMP,
   TentativeAuthentificationCPS,
-  NotificationAccesDMP
+  NotificationAccesDMP,
+  Historique2FA
 };

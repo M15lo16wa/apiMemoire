@@ -102,29 +102,19 @@ exports.getAllDossiers = async (req, res) => {
  * @param {object} res - L'objet de réponse Express.
  */
 exports.getDossierById = async (req, res) => {
-    const { id } = req.params;
-    
-    // Validation de l'ID
-    if (!id || id === 'null' || id === 'undefined') {
-        return res.status(400).json({ 
-            message: 'ID du dossier médical requis et valide' 
-        });
-    }
-    
-    // Conversion en nombre
-    const dossierId = parseInt(id, 10);
-    if (isNaN(dossierId) || dossierId <= 0) {
-        return res.status(400).json({ 
-            message: 'ID du dossier médical doit être un nombre valide' 
-        });
-    }
+    // Utiliser l'ID validé par le middleware
+    const dossierId = req.validatedParams?.dossierId || req.params.id;
     
     try {
         console.log('🔍 [getDossierById] Recherche du dossier:', dossierId);
         const dossier = await dossierMedicalService.getDossierById(dossierId);
         
         if (!dossier) {
-            return res.status(404).json({ message: 'Dossier médical non trouvé.' });
+            return res.status(404).json({ 
+                status: 'error',
+                message: 'Dossier médical non trouvé.',
+                errorCode: 'DOSSIER_NOT_FOUND'
+            });
         }
         
         console.log('✅ [getDossierById] Dossier trouvé:', dossierId);
@@ -134,7 +124,11 @@ exports.getDossierById = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ [getDossierById] Erreur lors de la récupération:', error);
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ 
+            status: 'error',
+            message: 'Erreur serveur lors de la récupération du dossier',
+            errorCode: 'INTERNAL_ERROR'
+        });
     }
 };
 
@@ -146,44 +140,43 @@ exports.getDossierById = async (req, res) => {
 exports.updateDossier = async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-    }
-    
-    const { id } = req.params;
-    
-    // Validation de l'ID
-    if (!id || id === 'null' || id === 'undefined') {
         return res.status(400).json({ 
-            message: 'ID du dossier médical requis et valide' 
+            status: 'error',
+            message: 'Données de validation invalides',
+            errors: errors.array() 
         });
     }
     
-    // Conversion en nombre
-    const dossierId = parseInt(id, 10);
-    if (isNaN(dossierId) || dossierId <= 0) {
-        return res.status(400).json({ 
-            message: 'ID du dossier médical doit être un nombre valide' 
-        });
-    }
+    // Utiliser l'ID validé par le middleware
+    const dossierId = req.validatedParams?.dossierId || req.params.id;
     
-    const updateData = req.body; // updatedBy peut être ajouté ici via un middleware d'authentification
+    const updateData = req.body;
 
     try {
         console.log('🔍 [updateDossier] Tentative de mise à jour du dossier:', dossierId);
         const dossierMisAJour = await dossierMedicalService.updateDossier(dossierId, updateData);
         
         if (!dossierMisAJour) {
-            return res.status(404).json({ message: 'Dossier médical non trouvé.' });
+            return res.status(404).json({ 
+                status: 'error',
+                message: 'Dossier médical non trouvé.',
+                errorCode: 'DOSSIER_NOT_FOUND'
+            });
         }
         
         console.log('✅ [updateDossier] Dossier mis à jour avec succès:', dossierId);
         res.status(200).json({ 
+            status: 'success',
             message: 'Dossier médical mis à jour avec succès.', 
-            dossier: dossierMisAJour 
+            data: dossierMisAJour 
         });
     } catch (error) {
         console.error('❌ [updateDossier] Erreur lors de la mise à jour:', error);
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ 
+            status: 'error',
+            message: 'Erreur serveur lors de la mise à jour du dossier',
+            errorCode: 'INTERNAL_ERROR'
+        });
     }
 };
 
@@ -193,36 +186,34 @@ exports.updateDossier = async (req, res) => {
  * @param {object} res - L'objet de réponse Express.
  */
 exports.deleteDossier = async (req, res) => {
-    const { id } = req.params;
-    
-    // Validation de l'ID
-    if (!id || id === 'null' || id === 'undefined') {
-        return res.status(400).json({ 
-            message: 'ID du dossier médical requis et valide' 
-        });
-    }
-    
-    // Conversion en nombre
-    const dossierId = parseInt(id, 10);
-    if (isNaN(dossierId) || dossierId <= 0) {
-        return res.status(400).json({ 
-            message: 'ID du dossier médical doit être un nombre valide' 
-        });
-    }
+    // Utiliser l'ID validé par le middleware
+    const dossierId = req.validatedParams?.dossierId || req.params.id;
     
     try {
         console.log('🔍 [deleteDossier] Tentative de suppression du dossier:', dossierId);
-        const result = await dossierMedicalService.deleteDossier(dossierId);
+        const resultat = await dossierMedicalService.deleteDossier(dossierId);
         
-        if (result === 0) {
-            return res.status(404).json({ message: 'Dossier médical non trouvé.' });
+        if (!resultat) {
+            return res.status(404).json({ 
+                status: 'error',
+                message: 'Dossier médical non trouvé.',
+                errorCode: 'DOSSIER_NOT_FOUND'
+            });
         }
         
         console.log('✅ [deleteDossier] Dossier supprimé avec succès:', dossierId);
-        res.status(200).json({ message: 'Dossier médical supprimé avec succès.' });
+        res.status(200).json({ 
+            status: 'success',
+            message: 'Dossier médical supprimé avec succès.',
+            data: { dossierId }
+        });
     } catch (error) {
         console.error('❌ [deleteDossier] Erreur lors de la suppression:', error);
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ 
+            status: 'error',
+            message: 'Erreur serveur lors de la suppression du dossier',
+            errorCode: 'INTERNAL_ERROR'
+        });
     }
 };
 

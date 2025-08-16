@@ -4,6 +4,7 @@ const morgan = require('morgan');
 const globalErrorHandler = require('./middlewares/error.middleware');
 const apiRoutes = require('./routes/api');
 const AppError = require('./utils/appError');
+const { requestLogging, detectProblematicRequests } = require('./middlewares/requestLogging.middleware');
 
 const cookieParser = require('cookie-parser');
 const swaggerUi = require('swagger-ui-express');
@@ -22,6 +23,11 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Middleware de logging des requêtes (ajouté en premier pour tracer toutes les requêtes)
+app.use(requestLogging);
+app.use(detectProblematicRequests);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
