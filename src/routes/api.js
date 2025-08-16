@@ -24,6 +24,10 @@ router.use('/patient', autoMesureRoutes);
 // ===== ROUTES GÉNÉRIQUES (APRÈS LES ROUTES SPÉCIFIQUES) =====
 router.use('/patient', patientRoutes);
 
+// ===== ALIAS POUR COMPATIBILITÉ =====
+// Redirection de /patients vers /patient pour maintenir la compatibilité
+router.use('/patients', patientRoutes);
+
 // ===== AUTRES ROUTES =====
 router.use('/professionnelSante', professionnelSanteRoutes);
 router.use('/hopital', hopitalRoutes);

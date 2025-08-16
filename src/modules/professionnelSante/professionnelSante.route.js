@@ -154,6 +154,37 @@ router.route('/')
 
 /**
  * @swagger
+ * /professionnelSante/profile:
+ *   get:
+ *     summary: Récupérer le profil du professionnel connecté
+ *     tags: [ProfessionnelSante]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profil du professionnel connecté
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   $ref: '#/components/schemas/ProfessionnelSante'
+ *       401:
+ *         description: Non authentifié
+ *       404:
+ *         description: Profil non trouvé
+ */
+router.get('/profile', 
+  authMiddleware.protect, 
+  professionnelSanteController.getProfile
+);
+
+/**
+ * @swagger
  * /professionnelSante/{id}:
  *   get:
  *     summary: Récupérer un professionnel de santé par ID

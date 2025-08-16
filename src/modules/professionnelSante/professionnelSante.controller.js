@@ -24,6 +24,17 @@ exports.getProfessionnel = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.getProfile = catchAsync(async (req, res, next) => {
+  // Récupérer le profil du professionnel connecté
+  const professionnel = await professionnelSanteService.getProfessionnelById(req.user.id);
+  res.status(200).json({
+    status: 'success',
+    data: {
+      professionnel,
+    },
+  });
+});
+
 
 exports.createProfessionnel = catchAsync(async (req, res, next) => {
   // Assurez-vous que les champs essentiels sont présents
