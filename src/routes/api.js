@@ -17,12 +17,12 @@ const router = express.Router();
 
 router.use('/auth', authRoutes);
 
-// ===== ROUTES SPÉCIFIQUES (AVANT LES ROUTES GÉNÉRIQUES) =====
-// Monter les routes auto-mesures AVANT les routes patient pour éviter les conflits
-router.use('/patient', autoMesureRoutes);
-
-// ===== ROUTES GÉNÉRIQUES (APRÈS LES ROUTES SPÉCIFIQUES) =====
+// ===== ROUTES GÉNÉRIQUES (AVANT LES ROUTES SPÉCIFIQUES) =====
 router.use('/patient', patientRoutes);
+
+// ===== ROUTES SPÉCIFIQUES (APRÈS LES ROUTES GÉNÉRIQUES) =====
+// Monter les routes auto-mesures sous un préfixe différent pour éviter les conflits
+router.use('/auto-mesures', autoMesureRoutes);
 
 // ===== ALIAS POUR COMPATIBILITÉ =====
 // Redirection de /patients vers /patient pour maintenir la compatibilité

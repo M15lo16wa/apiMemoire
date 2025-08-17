@@ -72,15 +72,30 @@ exports.deleteProfessionnel = catchAsync(async (req, res, next) => {
 
 // Authentication endpoints for doctors
 exports.login = catchAsync(async (req, res, next) => {
-  const { numero_adeli, mot_de_passe } = req.body;
+  const { numero_adeli, mot_de_passe, twoFactorToken } = req.body;
 
   if (!numero_adeli || !mot_de_passe) {
     return next(new AppError('Veuillez fournir votre numéro ADELI et votre mot de passe', 400));
   }
 
   try {
-    const professionnel = await professionnelAuthService.loginProfessionnel(numero_adeli, mot_de_passe);
-    await professionnelAuthService.sendAuthToken(professionnel, 200, res);
+    // Utiliser la nouvelle méthode de connexion avec 2FA OBLIGATOIRE
+    const loginResult = await professionnelAuthService.loginProfessionnelWith2FA(numero_adeli, mot_de_passe, twoFactorToken);
+    
+    if (loginResult.requires2FA) {
+      // Première étape : identifiants vérifiés, 2FA requise
+      return res.status(200).json({
+        status: 'requires2FA',
+        message: loginResult.message,
+        data: {
+          professionnel: loginResult.professionnel,
+          requires2FA: true
+        }
+      });
+    }
+    
+    // Deuxième étape : 2FA validée, connexion complète
+    await professionnelAuthService.sendAuthToken(loginResult.professionnel, 200, res);
   } catch (error) {
     next(error);
   }

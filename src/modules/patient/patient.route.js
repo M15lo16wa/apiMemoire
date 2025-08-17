@@ -311,6 +311,70 @@ router.post('/auth/login', patientController.login);
 
 /**
  * @swagger
+ * /patient/auth/2fa-info:
+ *   post:
+ *     summary: Afficher les informations 2FA (secret et QR code) pour un patient
+ *     tags: [Patient]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - numero_assure
+ *             properties:
+ *               numero_assure:
+ *                 type: string
+ *                 example: "TEMP000005"
+ *                 description: "Numéro d'assuré du patient"
+ *     responses:
+ *       200:
+ *         description: Informations 2FA générées avec succès
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: "Informations 2FA générées avec succès"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     patient:
+ *                       $ref: '#/components/schemas/Patient'
+ *                     twoFactor:
+ *                       type: object
+ *                       properties:
+ *                         secret:
+ *                           type: string
+ *                           description: "Secret 2FA pour l'application authenticator"
+ *                         qrCode:
+ *                           type: string
+ *                           description: "QR code en base64 pour scanner avec l'app"
+ *                         recoveryCodes:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ *                           description: "Codes de récupération en cas de perte"
+ *                         instructions:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ *                           description: "Instructions d'utilisation"
+ *       400:
+ *         description: Numéro d'assuré manquant
+ *       404:
+ *         description: Patient non trouvé
+ */
+router.post('/auth/2fa-info', patientController.show2FAInfo);
+
+/**
+ * @swagger
  * /patient/auth/logout:
  *   post:
  *     summary: Déconnexion d'un patient

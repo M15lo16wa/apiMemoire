@@ -364,7 +364,7 @@ router.get('/',
  *       500:
  *         description: Erreur serveur
  */
-router.get('/patient/:patient_id',
+router.get('/:patient_id',
     authenticateToken,
     param('patient_id').isInt({ min: 1 }).withMessage('ID du patient invalide'),
     handleValidationErrors,
@@ -414,7 +414,7 @@ router.get('/patient/:patient_id',
  *       500:
  *         description: Erreur serveur
  */
-router.get('/patient/:patient_id/stats',
+router.get('/:patient_id/stats',
     authenticateToken,
     param('patient_id').isInt({ min: 1 }).withMessage('ID du patient invalide'),
     autoMesureController.getAutoMesuresStats
@@ -464,7 +464,7 @@ router.get('/patient/:patient_id/stats',
  *       500:
  *         description: Erreur serveur
  */
-router.get('/patient/:patient_id/last/:type_mesure',
+router.get('/:patient_id/last/:type_mesure',
     authenticateToken,
     param('patient_id').isInt({ min: 1 }).withMessage('ID du patient invalide'),
     param('type_mesure')

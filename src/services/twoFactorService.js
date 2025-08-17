@@ -13,6 +13,7 @@ class TwoFactorService {
    * @returns {string} Secret généré
    */
   static generateSecret(email) {
+    // Utiliser authenticator.generateSecret() pour la compatibilité avec authenticator.verify()
     return authenticator.generateSecret();
   }
 
@@ -41,7 +42,8 @@ class TwoFactorService {
    */
   static verifyToken(token, secret) {
     try {
-      return totp.verify({ token, secret });
+      // Utiliser authenticator.verify() pour la compatibilité avec authenticator.generateSecret()
+      return authenticator.verify(token, secret);
     } catch (error) {
       console.error('Erreur lors de la vérification du token 2FA:', error);
       return false;

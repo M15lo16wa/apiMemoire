@@ -3,6 +3,7 @@ const AppError = require('../../utils/appError');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const tokenService = require('../../services/tokenService');
+const TwoFactorService = require('../../services/twoFactorService');
 
 /**
  * Sign JWT token for professional
@@ -186,6 +187,88 @@ exports.changeProfessionnelPassword = async (professionnelId, currentPassword, n
   });
 
   return { message: 'Mot de passe mis à jour avec succès' };
+};
+
+/**
+ * Login professional with 2FA verification (OBLIGATOIRE)
+ * @param {string} numero_adeli - Professional ADELI number
+ * @param {string} mot_de_passe - Professional password
+ * @param {string} twoFactorToken - 2FA token (required for second step)
+ * @returns {Object} Login result
+ */
+exports.loginProfessionnelWith2FA = async (numero_adeli, mot_de_passe, twoFactorToken = null) => {
+  console.log('🔐 Login attempt with 2FA OBLIGATOIRE pour professionnel:', { 
+    numero_adeli, 
+    password_length: mot_de_passe ? mot_de_passe.length : 0,
+    has2FAToken: !!twoFactorToken
+  });
+  
+  if (!numero_adeli || !mot_de_passe) {
+    throw new AppError('Veuillez fournir votre numéro ADELI et votre mot de passe', 400);
+  }
+
+  try {
+    // Step 1: Verify credentials
+    const professionnel = await this.loginProfessionnel(numero_adeli, mot_de_passe);
+    
+    // Step 2: 2FA OBLIGATOIRE pour tous les professionnels de santé
+    if (!twoFactorToken) {
+      console.log('🔐 2FA OBLIGATOIRE - Première étape: identifiants vérifiés, 2FA requise');
+      
+      // Générer un secret 2FA temporaire si l'utilisateur n'en a pas
+      let twoFactorSecret = professionnel.two_factor_secret;
+      if (!twoFactorSecret) {
+        console.log('🔐 Génération d\'un secret 2FA temporaire pour ce professionnel');
+        twoFactorSecret = TwoFactorService.generateSecret(professionnel.email || professionnel.numero_adeli);
+        
+        // Stocker temporairement le secret (en session ou cache)
+        // Note: En production, il faudrait l'activer définitivement
+      }
+      
+      // First step: credentials verified, 2FA token required
+      return {
+        requires2FA: true,
+        professionnel: {
+          id_professionnel: professionnel.id_professionnel,
+          nom: professionnel.nom,
+          prenom: professionnel.prenom,
+          numero_adeli: professionnel.numero_adeli,
+          role: professionnel.role,
+          two_factor_enabled: true,
+          two_factor_secret: twoFactorSecret // Secret temporaire pour la session
+        },
+        message: 'Code d\'authentification à double facteur OBLIGATOIRE requis',
+        twoFactorSecret: twoFactorSecret // Pour le test, on le renvoie
+      };
+    }
+    
+    // Second step: verify 2FA token
+    console.log('🔐 2FA OBLIGATOIRE - Deuxième étape: vérification du code 2FA');
+    
+    // Récupérer le secret 2FA (depuis la session ou le cache en production)
+    let twoFactorSecret = professionnel.two_factor_secret;
+    if (!twoFactorSecret) {
+      // En production, il faudrait récupérer depuis la session/cache
+      throw new AppError('Session 2FA expirée, veuillez vous reconnecter', 401);
+    }
+    
+    const is2FAValid = TwoFactorService.verifyToken(twoFactorToken, twoFactorSecret);
+    
+    if (!is2FAValid) {
+      throw new AppError('Code d\'authentification à double facteur invalide', 401);
+    }
+    
+    console.log('✅ 2FA OBLIGATOIRE validée avec succès');
+    return {
+      requires2FA: false,
+      professionnel: professionnel,
+      message: 'Authentification complète réussie avec 2FA'
+    };
+    
+  } catch (error) {
+    console.error('Error in loginProfessionnelWith2FA:', error);
+    throw error;
+  }
 };
 
 exports.sendAuthToken = createSendToken;

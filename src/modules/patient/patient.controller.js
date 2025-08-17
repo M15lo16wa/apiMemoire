@@ -1,8 +1,10 @@
+const { Patient } = require('../../models');
 const patientService = require('./patient.service');
 const patientAuthService = require('./patient.auth.service');
 const catchAsync = require('../../utils/catchAsync');
 const accessService = require('../access/access.service');
 const tokenService = require('../../services/tokenService');
+const TwoFactorService = require('../../services/twoFactorService');
 
 const AppError = require('../../utils/appError');
 
@@ -76,15 +78,30 @@ exports.deletePatient = catchAsync(async (req, res, next) => {
 
 // Authentication endpoints for patients
 exports.login = catchAsync(async (req, res, next) => {
-  const { numero_assure, mot_de_passe } = req.body;
+  const { numero_assure, mot_de_passe, twoFactorToken } = req.body;
 
   if (!numero_assure || !mot_de_passe) {
     return next(new AppError('Veuillez fournir votre numéro d\'assuré et votre mot de passe', 400));
   }
 
   try {
-    const patient = await patientAuthService.loginPatient(numero_assure, mot_de_passe);
-    await patientAuthService.sendAuthToken(patient, 200, res);
+    // Utiliser la nouvelle méthode de connexion avec 2FA
+    const loginResult = await patientAuthService.loginPatientWith2FA(numero_assure, mot_de_passe, twoFactorToken);
+    
+    if (loginResult.requires2FA) {
+      // Première étape : identifiants vérifiés, 2FA requise
+      return res.status(200).json({
+        status: 'requires2FA',
+        message: loginResult.message,
+        data: {
+          patient: loginResult.patient,
+          requires2FA: true
+        }
+      });
+    }
+    
+    // Deuxième étape : 2FA validée ou non requise, connexion complète
+    await patientAuthService.sendAuthToken(loginResult.patient, 200, res);
   } catch (error) {
     next(error);
   }
@@ -275,4 +292,73 @@ exports.marquerNotificationLue = catchAsync(async (req, res, next) => {
         status: 'success',
         message: 'Notification marquée comme lue.'
     });
+});
+
+/**
+ * Afficher les informations 2FA (secret et QR code) pour un patient
+ * Accessible après connexion initiale réussie
+ */
+exports.show2FAInfo = catchAsync(async (req, res, next) => {
+  const { numero_assure } = req.body;
+  
+  if (!numero_assure) {
+    return next(new AppError('Numéro d\'assuré requis', 400));
+  }
+
+  try {
+    // Trouver le patient
+    const patient = await Patient.findOne({
+      where: { numero_assure }
+    });
+
+    if (!patient) {
+      return next(new AppError('Patient non trouvé', 404));
+    }
+
+    // Générer ou récupérer le secret 2FA
+    let twoFactorSecret = patient.two_factor_secret;
+    if (!twoFactorSecret) {
+      twoFactorSecret = TwoFactorService.generateSecret(patient.email || patient.numero_assure);
+      
+      // Optionnel : sauvegarder le secret en base
+      // await patient.update({ two_factor_secret: twoFactorSecret });
+    }
+
+    // Générer le QR code
+    const qrCodeDataURL = await TwoFactorService.generateQRCode(
+      patient.email || patient.numero_assure,
+      twoFactorSecret,
+      'DMP Platform'
+    );
+
+    // Générer des codes de récupération
+    const recoveryCodes = TwoFactorService.generateRecoveryCodes(5);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Informations 2FA générées avec succès',
+      data: {
+        patient: {
+          id_patient: patient.id_patient,
+          nom: patient.nom,
+          prenom: patient.prenom,
+          numero_assure: patient.numero_assure
+        },
+        twoFactor: {
+          secret: twoFactorSecret,
+          qrCode: qrCodeDataURL,
+          recoveryCodes: recoveryCodes,
+          instructions: [
+            '1. Scannez le QR code avec votre application authenticator (Google Authenticator, Authy, etc.)',
+            '2. Entrez le code 6 chiffres affiché dans votre app pour finaliser la connexion',
+            '3. Conservez les codes de récupération en lieu sûr'
+          ]
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur lors de la génération des informations 2FA:', error);
+    return next(new AppError('Erreur lors de la génération des informations 2FA', 500));
+  }
 });

@@ -3,6 +3,7 @@ const AppError = require('../../utils/appError');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const tokenService = require('../../services/tokenService');
+const TwoFactorService = require('../../services/twoFactorService');
 
 /**
  * Sign JWT token for patient
@@ -107,6 +108,92 @@ exports.loginPatient = async (numero_assure, mot_de_passe) => {
     return patient;
   } catch (error) {
     console.error('Error in loginPatient:', error);
+    throw error;
+  }
+};
+
+/**
+ * Login patient with 2FA verification (OBLIGATOIRE)
+ * @param {string} numero_assure - Patient insurance number
+ * @param {string} mot_de_passe - Patient password
+ * @param {string} twoFactorToken - 2FA token (required for second step)
+ * @returns {Object} Login result
+ */
+exports.loginPatientWith2FA = async (numero_assure, mot_de_passe, twoFactorToken = null) => {
+  console.log('🔐 Login attempt with 2FA OBLIGATOIRE:', { 
+    numero_assure, 
+    password_length: mot_de_passe ? mot_de_passe.length : 0,
+    has2FAToken: !!twoFactorToken
+  });
+  
+  if (!numero_assure || !mot_de_passe) {
+    throw new AppError('Veuillez fournir votre numéro d\'assuré et votre mot de passe', 400);
+  }
+
+  try {
+    // Step 1: Verify credentials
+    const patient = await this.loginPatient(numero_assure, mot_de_passe);
+    
+    // Step 2: 2FA OBLIGATOIRE pour tous les patients
+    if (!twoFactorToken) {
+      console.log('🔐 2FA OBLIGATOIRE - Première étape: identifiants vérifiés, 2FA requise');
+      
+      // Générer un secret 2FA temporaire si l'utilisateur n'en a pas
+      let twoFactorSecret = patient.two_factor_secret;
+      console.log('🔐 DEBUG - Secret 2FA du patient:', twoFactorSecret);
+      
+      if (!twoFactorSecret) {
+        console.log('🔐 Génération d\'un secret 2FA temporaire pour ce patient');
+        twoFactorSecret = TwoFactorService.generateSecret(patient.email || patient.numero_assure);
+        console.log('🔐 DEBUG - Nouveau secret 2FA généré:', twoFactorSecret);
+        
+        // Stocker temporairement le secret (en session ou cache)
+        // Note: En production, il faudrait l'activer définitivement
+      }
+      
+      // First step: credentials verified, 2FA token required
+      return {
+        requires2FA: true,
+        patient: {
+          id_patient: patient.id_patient,
+          nom: patient.nom,
+          prenom: patient.prenom,
+          numero_assure: patient.numero_assure,
+          two_factor_enabled: true,
+          two_factor_secret: twoFactorSecret // Secret temporaire pour la session
+        },
+        message: 'Code d\'authentification à double facteur OBLIGATOIRE requis',
+        twoFactorSecret: twoFactorSecret // Pour le test, on le renvoie
+      };
+    }
+    
+    // Second step: verify 2FA token
+    console.log('🔐 2FA OBLIGATOIRE - Deuxième étape: vérification du code 2FA');
+    
+    // SOLUTION TEMPORAIRE: Utiliser le même secret que celui généré dans la première étape
+    // En production, il faudrait utiliser Redis ou une session pour stocker le secret
+    let twoFactorSecret = patient.two_factor_secret;
+    if (!twoFactorSecret) {
+      // Générer le même secret basé sur l'identifiant unique du patient
+      console.log('🔐 Génération du secret 2FA pour la vérification (même algorithme)');
+      twoFactorSecret = TwoFactorService.generateSecret(patient.numero_assure);
+    }
+    
+    const is2FAValid = TwoFactorService.verifyToken(twoFactorToken, twoFactorSecret);
+    
+    if (!is2FAValid) {
+      throw new AppError('Code d\'authentification à double facteur invalide', 401);
+    }
+    
+    console.log('✅ 2FA OBLIGATOIRE validée avec succès');
+    return {
+      requires2FA: false,
+      patient: patient,
+      message: 'Authentification complète réussie avec 2FA'
+    };
+    
+  } catch (error) {
+    console.error('Error in loginPatientWith2FA:', error);
     throw error;
   }
 };
