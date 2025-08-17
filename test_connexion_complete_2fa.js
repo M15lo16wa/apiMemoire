@@ -60,6 +60,8 @@ const loginStep1 = () => {
                         if (response.status === 'requires2FA') {
                             console.log('   ✅ 2FA OBLIGATOIRE activée !');
                             console.log('   🔐 Code 2FA requis pour finaliser la connexion');
+                            console.log('   📋 Réponse complète:', JSON.stringify(response, null, 2));
+                            console.log('   🔐 Secret 2FA reçu:', response.twoFactorSecret ? 'OUI' : 'NON');
                             resolve({ 
                                 success: true, 
                                 requires2FA: true,
@@ -96,8 +98,10 @@ const loginStep1 = () => {
 const loginStep2 = (twoFactorSecret) => {
     return new Promise((resolve) => {
         // Générer un code 2FA valide basé sur le secret
-        // authenticator.generate() prend le secret en premier paramètre
-        const twoFactorToken = authenticator.generate(twoFactorSecret || '');
+        // Utiliser TwoFactorService pour la cohérence avec le serveur
+        const TwoFactorService = require('./src/services/twoFactorService');
+        const tokenInfo = TwoFactorService.generateTokenWithInfo(twoFactorSecret || '');
+        const twoFactorToken = tokenInfo.token;
         
         const postData = JSON.stringify({
             numero_assure: TEST_CREDENTIALS.numeroAssure,

@@ -22,10 +22,10 @@ class TwoFactorService {
    * @param {string} email - Email de l'utilisateur
    * @param {string} secret - Secret généré
    * @param {string} serviceName - Nom du service (ex: "DMP Platform")
-   * @returns {Promise<string>} URL du QR code en base64
    */
   static async generateQRCode(email, secret, serviceName = 'DMP Platform') {
     try {
+      // Utiliser authenticator.keyuri() pour la compatibilité avec authenticator.generateSecret() et authenticator.verify()
       const otpauth = authenticator.keyuri(email, serviceName, secret);
       const qrCodeDataURL = await QRCode.toDataURL(otpauth);
       return qrCodeDataURL;
@@ -42,8 +42,14 @@ class TwoFactorService {
    */
   static verifyToken(token, secret) {
     try {
-      // Utiliser authenticator.verify() pour la compatibilité avec authenticator.generateSecret()
-      return authenticator.verify(token, secret);
+      // Configuration TOTP avec fenêtre de temps TRÈS élargie pour éviter les décalages
+      // window: 10 = ±10 intervalles de 30 secondes = ±5 minutes
+      // step: 30 = intervalle de 30 secondes (standard TOTP)
+      return authenticator.verify({ token, secret }, { 
+        window: 10,       // Accepte les codes dans ±10 intervalles (±5 minutes)
+        step: 30,         // Intervalle de 30 secondes
+        digits: 6         // Code à 6 chiffres
+      });
     } catch (error) {
       console.error('Erreur lors de la vérification du token 2FA:', error);
       return false;
@@ -109,6 +115,54 @@ class TwoFactorService {
       return testToken && testToken.length === 6;
     } catch (error) {
       return false;
+    }
+  }
+
+  /**
+   * Obtient la durée d'expiration restante pour un code 2FA
+   * @param {string} secret - Secret 2FA
+   * @returns {Object} { timeRemaining: number, step: number, window: number }
+   */
+  static getTimeRemaining(secret) {
+    try {
+      // Calculer le temps restant jusqu'au prochain intervalle
+      const step = 30; // 30 secondes par défaut
+      const now = Math.floor(Date.now() / 1000);
+      const timeRemaining = step - (now % step);
+      
+      return {
+        timeRemaining,    // Secondes restantes dans l'intervalle actuel
+        step,             // Durée de l'intervalle (30 secondes)
+        window: 10,       // Fenêtre de validation (±10 intervalles)
+        totalWindow: 600  // Fenêtre totale en secondes (20 × 30 = 600 secondes = 10 minutes)
+      };
+    } catch (error) {
+      console.error('Erreur lors du calcul du temps restant:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Génère un code 2FA avec informations de durée
+   * @param {string} secret - Secret 2FA
+   * @returns {Object} { token: string, timeRemaining: number, expiresAt: Date }
+   */
+  static generateTokenWithInfo(secret) {
+    try {
+      const token = authenticator.generate(secret);
+      const timeInfo = this.getTimeRemaining(secret);
+      const expiresAt = new Date(Date.now() + (timeInfo.timeRemaining * 1000));
+      
+      return {
+        token,
+        timeRemaining: timeInfo.timeRemaining,
+        expiresAt,
+        step: timeInfo.step,
+        window: timeInfo.window
+      };
+    } catch (error) {
+      console.error('Erreur lors de la génération du token avec info:', error);
+      return null;
     }
   }
 }

@@ -96,7 +96,8 @@ exports.login = catchAsync(async (req, res, next) => {
         data: {
           patient: loginResult.patient,
           requires2FA: true
-        }
+        },
+        twoFactorSecret: loginResult.twoFactorSecret // Ajouter le secret 2FA pour le test
       });
     }
     

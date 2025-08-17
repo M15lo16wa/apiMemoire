@@ -147,8 +147,9 @@ exports.loginPatientWith2FA = async (numero_assure, mot_de_passe, twoFactorToken
         twoFactorSecret = TwoFactorService.generateSecret(patient.email || patient.numero_assure);
         console.log('🔐 DEBUG - Nouveau secret 2FA généré:', twoFactorSecret);
         
-        // Stocker temporairement le secret (en session ou cache)
-        // Note: En production, il faudrait l'activer définitivement
+        // Stocker temporairement le secret en base pour cette session
+        await patient.update({ two_factor_secret: twoFactorSecret });
+        console.log('🔐 DEBUG - Secret 2FA sauvegardé en base temporairement');
       }
       
       // First step: credentials verified, 2FA token required
