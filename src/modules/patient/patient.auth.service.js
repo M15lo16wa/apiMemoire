@@ -23,7 +23,7 @@ const signToken = (id) => {
  * @param {Object} res - Express response object
  */
 const createSendToken = async (patient, statusCode, res) => {
-  console.log('🔍 DEBUG createSendToken - Patient reçu:', {
+  console.log(' DEBUG createSendToken - Patient reçu:', {
     id_patient: patient.id_patient,
     nom: patient.nom,
     prenom: patient.prenom,
@@ -33,9 +33,9 @@ const createSendToken = async (patient, statusCode, res) => {
 
   try {
     // Générer et stocker le token avec Redis
-    console.log('🔍 DEBUG - Appel de tokenService.generateAndStoreToken...');
+    console.log(' DEBUG - Appel de tokenService.generateAndStoreToken...');
     const token = await tokenService.generateAndStoreToken(patient, 'patient');
-    console.log('🔍 DEBUG - Token généré avec succès:', token ? token.substring(0, 20) + '...' : 'Aucun token');
+    console.log(' DEBUG - Token généré avec succès:', token ? token.substring(0, 20) + '...' : 'Aucun token');
 
     const cookieOptions = {
       expires: new Date(
@@ -51,7 +51,7 @@ const createSendToken = async (patient, statusCode, res) => {
     // Remove password from output
     patient.mot_de_passe = undefined;
 
-    console.log('🔍 DEBUG - Envoi de la réponse avec token');
+    console.log('DEBUG - Envoi de la réponse avec token');
     res.status(statusCode).json({
       status: 'success',
       token,
@@ -60,7 +60,7 @@ const createSendToken = async (patient, statusCode, res) => {
       },
     });
   } catch (error) {
-    console.error('❌ ERREUR dans createSendToken:', error);
+    console.error(' ERREUR dans createSendToken:', error);
     throw error;
   }
 };
@@ -120,7 +120,7 @@ exports.loginPatient = async (numero_assure, mot_de_passe) => {
  * @returns {Object} Login result
  */
 exports.loginPatientWith2FA = async (numero_assure, mot_de_passe, twoFactorToken = null) => {
-  console.log('🔐 Login attempt with 2FA OBLIGATOIRE:', { 
+  console.log('Login attempt with 2FA OBLIGATOIRE:', { 
     numero_assure, 
     password_length: mot_de_passe ? mot_de_passe.length : 0,
     has2FAToken: !!twoFactorToken
@@ -136,20 +136,20 @@ exports.loginPatientWith2FA = async (numero_assure, mot_de_passe, twoFactorToken
     
     // Step 2: 2FA OBLIGATOIRE pour tous les patients
     if (!twoFactorToken) {
-      console.log('🔐 2FA OBLIGATOIRE - Première étape: identifiants vérifiés, 2FA requise');
+      console.log('2FA OBLIGATOIRE - Première étape: identifiants vérifiés, 2FA requise');
       
       // Générer un secret 2FA temporaire si l'utilisateur n'en a pas
       let twoFactorSecret = patient.two_factor_secret;
-      console.log('🔐 DEBUG - Secret 2FA du patient:', twoFactorSecret);
+      console.log(' DEBUG - Secret 2FA du patient:', twoFactorSecret);
       
       if (!twoFactorSecret) {
-        console.log('🔐 Génération d\'un secret 2FA temporaire pour ce patient');
+        console.log('Génération d\'un secret 2FA temporaire pour ce patient');
         twoFactorSecret = TwoFactorService.generateSecret(patient.email || patient.numero_assure);
-        console.log('🔐 DEBUG - Nouveau secret 2FA généré:', twoFactorSecret);
+        console.log('DEBUG - Nouveau secret 2FA généré:', twoFactorSecret);
         
         // Stocker temporairement le secret en base pour cette session
         await patient.update({ two_factor_secret: twoFactorSecret });
-        console.log('🔐 DEBUG - Secret 2FA sauvegardé en base temporairement');
+        console.log(' DEBUG - Secret 2FA sauvegardé en base temporairement');
       }
       
       // First step: credentials verified, 2FA token required
@@ -169,14 +169,14 @@ exports.loginPatientWith2FA = async (numero_assure, mot_de_passe, twoFactorToken
     }
     
     // Second step: verify 2FA token
-    console.log('🔐 2FA OBLIGATOIRE - Deuxième étape: vérification du code 2FA');
+    console.log('2FA OBLIGATOIRE - Deuxième étape: vérification du code 2FA');
     
     // SOLUTION TEMPORAIRE: Utiliser le même secret que celui généré dans la première étape
     // En production, il faudrait utiliser Redis ou une session pour stocker le secret
     let twoFactorSecret = patient.two_factor_secret;
     if (!twoFactorSecret) {
       // Générer le même secret basé sur l'identifiant unique du patient
-      console.log('🔐 Génération du secret 2FA pour la vérification (même algorithme)');
+      console.log('Génération du secret 2FA pour la vérification (même algorithme)');
       twoFactorSecret = TwoFactorService.generateSecret(patient.numero_assure);
     }
     
@@ -186,7 +186,7 @@ exports.loginPatientWith2FA = async (numero_assure, mot_de_passe, twoFactorToken
       throw new AppError('Code d\'authentification à double facteur invalide', 401);
     }
     
-    console.log('✅ 2FA OBLIGATOIRE validée avec succès');
+    console.log('2FA OBLIGATOIRE validée avec succès');
     return {
       requires2FA: false,
       patient: patient,
